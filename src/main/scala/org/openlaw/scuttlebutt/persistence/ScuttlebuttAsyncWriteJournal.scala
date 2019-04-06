@@ -14,6 +14,8 @@ import com.typesafe.config.Config
 import io.vertx.core.Vertx
 import net.consensys.cava.bytes.{Bytes, Bytes32}
 import net.consensys.cava.concurrent.AsyncResult
+import net.consensys.cava.crypto.sodium.Box.KeyPair
+import net.consensys.cava.crypto.sodium.Signature
 import net.consensys.cava.io.Base64
 import net.consensys.cava.scuttlebutt.handshake.vertx.SecureScuttlebuttVertxClient
 import net.consensys.cava.scuttlebutt.rpc.mux.exceptions.ConnectionClosedException
@@ -31,26 +33,30 @@ import scala.util.{Failure, Success, Try}
 class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
 
   val objectMapper: ObjectMapper = new ScuttlebuttPersistenceSerializationConfig().getObjectMapper()
-
   val rpcHandler: Multiplexer = getMultiplexer()
 
   def getMultiplexer(): Multiplexer = {
 
-    val keyPair = KeyUtils.getLocalKeys().get
+    val keyPair: Option[Signature.KeyPair] = KeyUtils.getLocalKeys()
+
+    // TODO: make it possible to modify the host, etc, in the akka config
+
+    if (!keyPair.isDefined) {
+      // TODO: more specific exception type
+      throw new Exception("Could not find local scuttlebutt keys.")
+    }
+
+    val localKeys = keyPair.get
 
     val networkKeyBase64 = "1KHLiKZvAvjbY1ziZEHMXawbCEIM6qwjCDm3VYRan/s="
     val networkKeyBytes32 = Bytes32.wrap(Base64.decode(networkKeyBase64))
-
     val host = "localhost"
     val port = 8008
-
     val vertx = Vertx.vertx()
-
     val loggerProvider = SimpleLogger.withLogLevel(Level.DEBUG).toPrintWriter(new PrintWriter(new BufferedWriter(new OutputStreamWriter(System.out, UTF_8))))
+    val secureScuttlebuttVertxClient = new SecureScuttlebuttVertxClient(loggerProvider, vertx, localKeys, networkKeyBytes32)
 
-    val secureScuttlebuttVertxClient = new SecureScuttlebuttVertxClient(loggerProvider, vertx, keyPair, networkKeyBytes32)
-
-    val onConnect: AsyncResult[RPCHandler] = secureScuttlebuttVertxClient.connectTo(port, host, keyPair.publicKey, (sender: Consumer[Bytes], terminationFn: Runnable) => {
+    val onConnect: AsyncResult[RPCHandler] = secureScuttlebuttVertxClient.connectTo(port, host, localKeys.publicKey, (sender: Consumer[Bytes], terminationFn: Runnable) => {
       def makeHandler(sender: Consumer[Bytes], terminationFn: Runnable) = new RPCHandler(sender, terminationFn, objectMapper, loggerProvider)
 
       makeHandler(sender, terminationFn)
@@ -62,9 +68,7 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
 
   def makeRPCMessage(persistentRep: PersistentRepr): RPCAsyncRequest = {
     val func: RPCFunction = new RPCFunction("publish")
-
     val repWithClassName: PersistentRepr = persistentRep.withManifest(persistentRep.payload.getClass.getName)
-
     val reqBody: ObjectNode = objectMapper.valueToTree(repWithClassName)
     reqBody.set("type", reqBody.get("persistenceId"))
 
@@ -78,14 +82,12 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
     } else {
       val individualMessages = messages.map(_.payload).flatten.sortBy(_.sequenceNr)
       val reqs: immutable.Seq[RPCAsyncRequest] = individualMessages.map(makeRPCMessage)
-
       val emptySeq: immutable.Seq[Try[Unit]] = immutable.Seq()
 
       // We perform each write sequentially, and if any of the previous writes fail we do not attempt any
       // subsequent writes
       reqs.foldRight[Future[immutable.Seq[Try[Unit]]]](Future.successful(emptySeq)) {
         (req: RPCAsyncRequest, result: Future[immutable.Seq[Try[Unit]]]) => {
-
           result.flatMap(statuses => {
             statuses.find(result => result.isFailure) match {
               case Some(x) => Future.successful(statuses :+ Failure(new Exception("Previous write failed")))
@@ -95,10 +97,7 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
               }
             }
           })
-
         }
-
-
       }
     }
   }
@@ -128,7 +127,6 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
         } else {
           promise.success(Success())
         }
-
       }
 
     })
@@ -146,12 +144,9 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
   override def asyncReplayMessages(persistenceId: String, fromSequenceNr: Long, toSequenceNr: Long, max: Long)(
     recoveryCallback: PersistentRepr => Unit
   ) = {
-
     val finishedReplaysPromise = Promise[Unit]();
-
     var function: RPCFunction = new RPCFunction(util.Arrays.asList("query"), "read")
     val query = makeReplayQuery(persistenceId, fromSequenceNr, Some(toSequenceNr), max)
-
     val request: RPCStreamRequest = new RPCStreamRequest(function, util.Arrays.asList(query))
 
     rpcHandler.openStream(request, (closer: Runnable) => {
@@ -163,18 +158,14 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
 
   override def asyncReadHighestSequenceNr(persistenceId: String, fromSequenceNr: Long): Future[Long] = {
     val result = Promise[Long]()
-
     val query = makeReplayQuery(persistenceId, fromSequenceNr, None, 1, reverse = true)
-
-
     var function: RPCFunction = new RPCFunction(util.Arrays.asList("query"), "read")
     val req: RPCStreamRequest = new RPCStreamRequest(function, util.Arrays.asList(query))
-
 
     rpcHandler.openStream(req, (closer: Runnable) => {
       new ScuttlebuttStreamHandler() {
         override def onMessage(rpcMessage: RPCMessage): Unit = {
-          val node:ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])
+          val node: ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])
           val content: JsonNode = node.findPath("content")
 
           val responseBody: PersistentRepr = objectMapper.treeToValue(content, classOf[PersistedMessage])
@@ -182,11 +173,9 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
         }
 
         override def onStreamEnd(): Unit = {
-
           if (!result.isCompleted) {
             result.success(0)
           }
-
         }
 
         override def onStreamError(e: Exception): Unit = {
@@ -201,6 +190,7 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
   private def makeReplayQuery(persistenceId: String, fromSequenceNr: Long, toSequenceNr: Option[Long], max: Long, reverse: Boolean = false): ObjectNode = {
     val rangeFilter = Map("$gte" -> fromSequenceNr) ++ toSequenceNr.fold(Map[String, Long]())(to => Map("$lte" -> to))
 
+    // TODO: filter to just own public key as author. Also, make a query builder class and class representation of a query
     val query = Map(
       "query" ->
         List(
@@ -216,7 +206,6 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
         ),
       "limit" -> max,
       "reverse" -> reverse)
-
 
     objectMapper.valueToTree(query)
   }

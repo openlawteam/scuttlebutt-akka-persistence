@@ -50,7 +50,7 @@ object ScuttlebuttPersistentActorExampleTest {
     // default Actor constructor
     val helloActor = system.actorOf(Props[ScuttlebuttPersistentActorExample], name = "persist-test-actor")
 
-    helloActor ! Cmd("Test test test 123")
+    helloActor ! Cmd("Test")
 
     helloActor ! "print"
   }

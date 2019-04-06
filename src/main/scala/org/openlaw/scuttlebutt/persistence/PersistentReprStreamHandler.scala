@@ -22,7 +22,8 @@ class PersistentReprStreamHandler(
 
     val persistentRepr : PersistentRepr = objectMapper.treeToValue(content, classOf[PersistedMessage])
 
-    // TODO: do we need some sort of pluggable serializer in case classes move to different packages, etc?
+    // TODO: test schema evolution strategies (such as EventAdapter) for when event classes move package or are modified
+    // https://doc.akka.io/docs/akka/current/persistence-schema-evolution.html
 
     val targetClass: String = persistentRepr.manifest
     val clazz: Class[_]  = Class.forName(targetClass)
@@ -39,7 +40,7 @@ class PersistentReprStreamHandler(
   }
 
   override def onStreamError(e: Exception): Unit = {
-    throw e
+    finishedPromise.failure(e)
   }
 }
 

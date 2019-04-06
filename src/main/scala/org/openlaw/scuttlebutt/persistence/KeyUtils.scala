@@ -54,8 +54,6 @@ object KeyUtils {
 
         return Some(new Signature.KeyPair(pub, secretKey))
       }
-
-
     })
   }
 
