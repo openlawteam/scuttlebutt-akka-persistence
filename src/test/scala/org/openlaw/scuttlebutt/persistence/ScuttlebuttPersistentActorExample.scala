@@ -27,6 +27,7 @@ class ScuttlebuttPersistentActorExample extends PersistentActor {
   val receiveRecover: Receive = {
     case evt: Evt                                 => updateState(evt)
     case SnapshotOffer(_, snapshot: ExampleState) => state = snapshot
+    case x => println("Unrecognised: " + x)
   }
 
   val snapShotInterval = 1000

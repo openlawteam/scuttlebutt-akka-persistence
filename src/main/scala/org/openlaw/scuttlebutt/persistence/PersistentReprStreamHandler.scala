@@ -18,21 +18,11 @@ class PersistentReprStreamHandler(
   override def onMessage(rpcMessage: RPCMessage): Unit = {
     val node:ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])
     val content: JsonNode = node.findPath("content")
-    val payload = content.findPath("payload")
+    val payload: JsonNode = content.findPath("payload")
 
     val persistentRepr : PersistentRepr = objectMapper.treeToValue(content, classOf[PersistedMessage])
 
-    // TODO: test schema evolution strategies (such as EventAdapter) for when event classes move package or are modified
-    // https://doc.akka.io/docs/akka/current/persistence-schema-evolution.html
-
-    val targetClass: String = persistentRepr.manifest
-    val clazz: Class[_]  = Class.forName(targetClass)
-
-    // We deserialize the payload into the class in the manifest (that it was written to JSON from.)
-    val deserializedPayload = objectMapper.readValue(payload.toString(), clazz)
-    val reprWithTypedPayload = persistentRepr.withPayload(deserializedPayload)
-
-    recoveryCallback(reprWithTypedPayload)
+    recoveryCallback(persistentRepr.withPayload(payload))
   }
 
   override def onStreamEnd(): Unit = {
