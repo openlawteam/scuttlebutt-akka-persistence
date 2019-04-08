@@ -1,70 +1,32 @@
 package org.openlaw.scuttlebutt.persistence
 
-import java.io.{BufferedWriter, OutputStreamWriter, PrintWriter}
-import java.nio.charset.StandardCharsets.UTF_8
+
 import java.util
-import java.util.function.Consumer
 
 import akka.persistence.journal.AsyncWriteJournal
 import akka.persistence.{AtomicWrite, PersistentRepr}
-import akka.serialization.{Serialization, SerializationExtension}
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.Config
-import io.vertx.core.Vertx
-import net.consensys.cava.bytes.{Bytes, Bytes32}
 import net.consensys.cava.concurrent.AsyncResult
-import net.consensys.cava.crypto.sodium.Box.KeyPair
-import net.consensys.cava.crypto.sodium.Signature
-import net.consensys.cava.io.Base64
-import net.consensys.cava.scuttlebutt.handshake.vertx.SecureScuttlebuttVertxClient
 import net.consensys.cava.scuttlebutt.rpc.mux.exceptions.ConnectionClosedException
-import net.consensys.cava.scuttlebutt.rpc.mux.{Multiplexer, RPCHandler, ScuttlebuttStreamHandler}
-import net.consensys.cava.scuttlebutt.rpc.{RPCAsyncRequest, RPCFunction, RPCMessage, RPCStreamRequest}
-import org.logl.Level
-import org.logl.logl.SimpleLogger
+import net.consensys.cava.scuttlebutt.rpc.mux.{RPCHandler, ScuttlebuttStreamHandler}
+import net.consensys.cava.scuttlebutt.rpc._
 
 import scala.collection.immutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, _}
 import scala.util.{Failure, Success, Try}
+import FutureConverters.asyncResultToFuture
+import com.google.common.base.Optional
 
 
 class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
 
   val objectMapper: ObjectMapper = new ScuttlebuttPersistenceSerializationConfig().getObjectMapper()
-  val rpcHandler: Multiplexer = getMultiplexer()
+  val loader: MultiplexerLoader = new MultiplexerLoader(objectMapper, config)
 
-  def getMultiplexer(): Multiplexer = {
-
-    val keyPair: Option[Signature.KeyPair] = KeyUtils.getLocalKeys()
-
-    // TODO: make it possible to modify the host, etc, in the akka config
-
-    if (!keyPair.isDefined) {
-      // TODO: more specific exception type
-      throw new Exception("Could not find local scuttlebutt keys.")
-    }
-
-    val localKeys = keyPair.get
-
-    val networkKeyBase64 = "1KHLiKZvAvjbY1ziZEHMXawbCEIM6qwjCDm3VYRan/s="
-    val networkKeyBytes32 = Bytes32.wrap(Base64.decode(networkKeyBase64))
-    val host = "localhost"
-    val port = 8008
-    val vertx = Vertx.vertx()
-    val loggerProvider = SimpleLogger.withLogLevel(Level.DEBUG).toPrintWriter(new PrintWriter(new BufferedWriter(new OutputStreamWriter(System.out, UTF_8))))
-    val secureScuttlebuttVertxClient = new SecureScuttlebuttVertxClient(loggerProvider, vertx, localKeys, networkKeyBytes32)
-
-    val onConnect: AsyncResult[RPCHandler] = secureScuttlebuttVertxClient.connectTo(port, host, localKeys.publicKey, (sender: Consumer[Bytes], terminationFn: Runnable) => {
-      def makeHandler(sender: Consumer[Bytes], terminationFn: Runnable) = new RPCHandler(sender, terminationFn, objectMapper, loggerProvider)
-
-      makeHandler(sender, terminationFn)
-    })
-
-    onConnect.get
-
-  }
+  val rpcHandler: RPCHandler = loader.loadMultiplexer
 
   def makeRPCMessage(persistentRep: PersistentRepr): RPCAsyncRequest = {
     val func: RPCFunction = new RPCFunction("publish")
@@ -103,35 +65,26 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
   }
 
   private def doScuttlebuttPublish(request: RPCAsyncRequest): Future[Try[Unit]] = {
-    val promise: Promise[Try[Unit]] = Promise[Try[Unit]]();
 
-    val result: AsyncResult[RPCMessage] = rpcHandler.makeAsyncRequest(request)
+    val rpcResult: AsyncResult[RPCMessage] = rpcHandler.makeAsyncRequest(request)
+    val resultFuture: Future[RPCMessage] = asyncResultToFuture(rpcResult)
 
-    // Convert from AsyncResult from Cava to scala Future class
-    result.whenComplete((result, exception) => {
-      // The AsyncWriteJournal docs requires that the future is completed exceptionally only if there is a
-      // connection error, otherwise the inner 'try' should be a 'Failure'
-      if (exception != null && exception.isInstanceOf[ConnectionClosedException]) {
-        // The connection broke
-        promise.failure(exception)
-      } else if (exception != null) {
-        // An exception was thrown by our own process
-        promise.success(Failure(exception))
-      } else {
-
-        // An error was returned as the RPC response
-
+    resultFuture.map(
+      result => {
         if (result.lastMessageOrError()) {
-          val exception = new Exception("RPC request failed") // todo: more descriptive error from contents
-          promise.success(Failure(exception))
+          val message: Optional[RPCErrorBody] = result.getErrorBody(objectMapper)
+          val exception = message.transform(body => new Exception(body.getMessage)).or(new Exception(result.asString()))
+          Failure(exception)
         } else {
-          promise.success(Success())
+          Success()
         }
       }
-
+    ).recover({
+      // The AsyncWriteJournal interface requires that we only complete the future with an exception if it's
+      // a connection break that is the underlying cause, otherwise we return a 'Try' Failure
+      case x if !x.isInstanceOf[ConnectionClosedException] => Failure(x)
     })
 
-    return promise.future
   }
 
   def containsUnsupportedBulkWrite(messages: immutable.Seq[AtomicWrite]): Boolean = {
