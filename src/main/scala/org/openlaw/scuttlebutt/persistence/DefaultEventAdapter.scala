@@ -3,6 +3,9 @@ package org.openlaw.scuttlebutt.persistence
 import akka.persistence.journal.{EventAdapter, EventSeq}
 import com.fasterxml.jackson.databind.ObjectMapper
 
+/**
+  *
+  */
 class DefaultEventAdapter extends EventAdapter {
 
   val objectMapper: ObjectMapper = new ScuttlebuttPersistenceSerializationConfig().getObjectMapper()

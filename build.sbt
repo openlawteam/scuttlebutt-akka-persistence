@@ -20,6 +20,6 @@ libraryDependencies += "io.vertx" % "vertx-core" % "3.6.2"
 libraryDependencies += "org.logl" % "logl-logl" % "0.4.0-24B971-snapshot"
 libraryDependencies += "org.logl" % "logl-api" % "0.4.0-24B971-snapshot"
 
-libraryDependencies += "net.consensys.cava" % "cava" % "1.0.0-2C0C1B-snapshot"
+libraryDependencies += "net.consensys.cava" % "cava" % "1.0.0-B67A22-snapshot"
 
 libraryDependencies += "com.github.jnr" % "jnr-ffi" % "2.1.9"
