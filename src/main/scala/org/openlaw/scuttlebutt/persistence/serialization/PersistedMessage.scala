@@ -1,9 +1,8 @@
-package org.openlaw.scuttlebutt.persistence
+package org.openlaw.scuttlebutt.persistence.serialization
 
 import akka.actor.ActorRef
 import akka.persistence.PersistentRepr
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
-import sun.reflect.generics.reflectiveObjects.NotImplementedException
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 case class PersistedMessage (

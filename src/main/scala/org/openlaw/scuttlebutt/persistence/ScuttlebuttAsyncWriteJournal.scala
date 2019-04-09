@@ -8,18 +8,16 @@ import akka.persistence.{AtomicWrite, PersistentRepr}
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.Config
-import net.consensys.cava.concurrent.AsyncResult
-import net.consensys.cava.scuttlebutt.rpc.mux.exceptions.ConnectionClosedException
 import net.consensys.cava.scuttlebutt.rpc.mux.{RPCHandler, ScuttlebuttStreamHandler}
 import net.consensys.cava.scuttlebutt.rpc._
+import org.openlaw.scuttlebutt.persistence.driver.{MultiplexerLoader, ScuttlebuttDriver}
+import org.openlaw.scuttlebutt.persistence.query.QueryBuilder
+import org.openlaw.scuttlebutt.persistence.serialization.{PersistedMessage, ScuttlebuttPersistenceSerializationConfig}
 
 import scala.collection.immutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, _}
-import scala.util.{Failure, Success, Try}
-import FutureConverters.asyncResultToFuture
-import com.google.common.base.Optional
-
+import scala.util.{Failure, Try}
 
 class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
 
@@ -28,6 +26,8 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
 
   val rpcHandler: RPCHandler = loader.loadMultiplexer
   val scuttlebuttDriver: ScuttlebuttDriver = new ScuttlebuttDriver(rpcHandler, objectMapper)
+
+  val queryBuilder = new QueryBuilder(objectMapper)
 
   override def asyncWriteMessages(messages: immutable.Seq[AtomicWrite]): Future[immutable.Seq[Try[Unit]]] = {
 
@@ -66,11 +66,10 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
     recoveryCallback: PersistentRepr => Unit
   ) = {
     val finishedReplaysPromise = Promise[Unit]();
-    var function: RPCFunction = new RPCFunction(util.Arrays.asList("query"), "read")
-    val query = scuttlebuttDriver.makeReplayQuery(persistenceId, fromSequenceNr, toSequenceNr, max, false)
-    val request: RPCStreamRequest = new RPCStreamRequest(function, util.Arrays.asList(query))
 
-    rpcHandler.openStream(request, (closer: Runnable) => {
+    val query = queryBuilder.makeReplayQuery(persistenceId, fromSequenceNr, toSequenceNr, max, false)
+
+    scuttlebuttDriver.openQueryStream(query, (closer: Runnable) => {
       new PersistentReprStreamHandler(objectMapper, closer, recoveryCallback, finishedReplaysPromise)
     })
 
@@ -79,11 +78,9 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
 
   override def asyncReadHighestSequenceNr(persistenceId: String, fromSequenceNr: Long): Future[Long] = {
     val result = Promise[Long]()
-    val query = scuttlebuttDriver.makeReplayQuery(persistenceId, fromSequenceNr, 1, reverse = true)
-    var function: RPCFunction = new RPCFunction(util.Arrays.asList("query"), "read")
-    val req: RPCStreamRequest = new RPCStreamRequest(function, util.Arrays.asList(query))
+    val query = queryBuilder.makeReplayQuery(persistenceId, fromSequenceNr, 1, reverse = true)
 
-    rpcHandler.openStream(req, (closer: Runnable) => {
+    scuttlebuttDriver.openQueryStream(query, (closer: Runnable) => {
       new ScuttlebuttStreamHandler() {
         override def onMessage(rpcMessage: RPCMessage): Unit = {
           val node: ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])

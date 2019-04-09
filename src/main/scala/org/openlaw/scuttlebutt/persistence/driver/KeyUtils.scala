@@ -1,4 +1,4 @@
-package org.openlaw.scuttlebutt.persistence
+package org.openlaw.scuttlebutt.persistence.driver
 
 import java.io.File
 import java.nio.charset.StandardCharsets.UTF_8

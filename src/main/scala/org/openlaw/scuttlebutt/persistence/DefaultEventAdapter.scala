@@ -2,6 +2,7 @@ package org.openlaw.scuttlebutt.persistence
 
 import akka.persistence.journal.{EventAdapter, EventSeq}
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.openlaw.scuttlebutt.persistence.serialization.ScuttlebuttPersistenceSerializationConfig
 
 /**
   *
