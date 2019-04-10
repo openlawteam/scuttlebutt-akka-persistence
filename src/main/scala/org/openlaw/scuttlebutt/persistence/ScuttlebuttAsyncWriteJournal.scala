@@ -1,8 +1,5 @@
 package org.openlaw.scuttlebutt.persistence
 
-
-import java.util
-
 import akka.persistence.journal.AsyncWriteJournal
 import akka.persistence.{AtomicWrite, PersistentRepr}
 import com.fasterxml.jackson.databind.node.ObjectNode

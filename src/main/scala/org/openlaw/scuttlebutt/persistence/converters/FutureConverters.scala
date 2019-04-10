@@ -1,4 +1,4 @@
-package org.openlaw.scuttlebutt.persistence
+package org.openlaw.scuttlebutt.persistence.converters
 
 import net.consensys.cava.concurrent.AsyncResult
 

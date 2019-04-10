@@ -12,6 +12,7 @@ resolvers += "Local Maven Repository" at "file://"+Path.userHome.absolutePath+"/
 
 libraryDependencies += "com.typesafe.akka" %% "akka-persistence" % "2.5.21"
 libraryDependencies += "com.typesafe.akka" %% "akka-persistence-query" % "2.5.21"
+libraryDependencies += "com.typesafe.akka" %% "akka-stream" % "2.5.21"
 
 libraryDependencies += "com.fasterxml.jackson.core" % "jackson-core" % "2.9.8"
 libraryDependencies += "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.8"

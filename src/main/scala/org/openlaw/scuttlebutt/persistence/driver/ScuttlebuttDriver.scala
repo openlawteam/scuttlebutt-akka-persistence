@@ -3,7 +3,11 @@ package org.openlaw.scuttlebutt.persistence.driver
 import java.util
 import java.util.function.Function
 
+import akka.NotUsed
 import akka.persistence.PersistentRepr
+import akka.persistence.query.EventEnvelope
+import akka.stream.OverflowStrategy
+import akka.stream.scaladsl.Source
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.google.common.base.Optional
@@ -11,7 +15,7 @@ import net.consensys.cava.concurrent.AsyncResult
 import net.consensys.cava.scuttlebutt.rpc._
 import net.consensys.cava.scuttlebutt.rpc.mux.exceptions.ConnectionClosedException
 import net.consensys.cava.scuttlebutt.rpc.mux.{Multiplexer, ScuttlebuttStreamHandler}
-import org.openlaw.scuttlebutt.persistence.FutureConverters.asyncResultToFuture
+import org.openlaw.scuttlebutt.persistence.converters.FutureConverters.asyncResultToFuture
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
