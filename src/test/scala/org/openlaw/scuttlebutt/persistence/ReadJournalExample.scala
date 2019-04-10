@@ -22,7 +22,7 @@ object ReadJournalExample {
     )
 
     val source = readJournal.eventsByPersistenceId(
-      "sample-id-4", 0, 10000
+      "sample-id-4", 0, 11
     )
 
     source.runWith(Sink.foreach(println))

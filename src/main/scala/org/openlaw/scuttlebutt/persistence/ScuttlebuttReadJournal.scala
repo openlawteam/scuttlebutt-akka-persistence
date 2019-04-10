@@ -29,16 +29,16 @@ class ScuttlebuttReadJournal(config: Config,
                              persistenceId: String, fromSequenceNr: Long,
                              toSequenceNr: Long): Source[EventEnvelope, NotUsed] = {
 
-    // TODO: use configured step
-    val step = 5L
+    val step = config.getInt("max-buffer-size")
 
     val eventSource = Source.unfoldAsync[Long, Seq[EventEnvelope]](0) {
-      case start if start >= toSequenceNr => Future.successful(None)
+
+      case start if start > toSequenceNr => Future.successful(None)
       case start => {
-        val end = start + Math.min(start + step, toSequenceNr)
+        val end = Math.min(start + step, toSequenceNr)
 
         pollUntilAvailable(persistenceId, start, step, end).map(
-          results => Some((start + results.length) + 1 -> results)
+          results => Some((start + results.length) -> results)
         )
       }
     }
@@ -54,7 +54,7 @@ class ScuttlebuttReadJournal(config: Config,
       case events if events.isEmpty => {
 
         // TODO: use configured timeout
-        Thread.sleep(1000)
+        Thread.sleep(config.getDuration("refresh-interval").toMillis)
         pollUntilAvailable(persistenceId, start, max, end)
       }
       case events => Future.successful(events)
@@ -70,12 +70,11 @@ class ScuttlebuttReadJournal(config: Config,
 
     val persistentRepr : PersistentRepr = objectMapper.treeToValue(content, classOf[PersistedMessage])
 
-
     new EventEnvelope(
       Sequence(persistentRepr.sequenceNr),
       persistentRepr.persistenceId,
       persistentRepr.sequenceNr,
-      persistentRepr.payload
+      payload
     )
   }
 
