@@ -58,7 +58,6 @@ class ScuttlebuttReadJournal(
     rangeFiller.getEventMessages(persistenceId, start, max, end).map(events => events.map(toEnvelope)).flatMap {
       case events if events.isEmpty => {
 
-        // TODO: use configured timeout
         Thread.sleep(config.getDuration("refresh-interval").toMillis)
         pollUntilAvailable(persistenceId, start, max, end)
       }

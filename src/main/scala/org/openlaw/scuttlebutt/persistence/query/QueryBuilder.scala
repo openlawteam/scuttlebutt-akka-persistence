@@ -41,7 +41,11 @@ class QueryBuilder(objectMapper: ObjectMapper) {
               )
               ))
           ),
-          Map("$sort" -> "sequenceNr")
+          Map("$map" -> Map(
+            "value" -> List("value"),
+            "sequenceNr" -> List("value", "content", "sequenceNr")
+          )),
+          Map("$sort" -> List("sequenceNr"))
         ),
       "limit" -> max,
       "reverse" -> reverse)

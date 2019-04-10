@@ -74,8 +74,14 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
   }
 
   override def asyncReadHighestSequenceNr(persistenceId: String, fromSequenceNr: Long): Future[Long] = {
+    // There is a ssb-query bug whereby 'reverse' is ignored if a sort value is specified preventing us
+    // doing this the smart way (with a query that has a limit of 1, sorts in descending and a limit of 1,
+    // we work around by reading the full stream to the end for now as a workaround
+
     val result = Promise[Long]()
-    val query = queryBuilder.makeReplayQuery(persistenceId, fromSequenceNr, 1, reverse = true)
+    val query = queryBuilder.makeReplayQuery(persistenceId, fromSequenceNr, Long.MaxValue, reverse = false)
+
+    var currentMax = 0l
 
     scuttlebuttDriver.openQueryStream(query, (closer: Runnable) => {
       new ScuttlebuttStreamHandler() {
@@ -84,13 +90,12 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
           val content: JsonNode = node.findPath("content")
 
           val responseBody: PersistentRepr = objectMapper.treeToValue(content, classOf[PersistedMessage])
-          result.success(responseBody.sequenceNr)
+
+          currentMax = responseBody.sequenceNr
         }
 
         override def onStreamEnd(): Unit = {
-          if (!result.isCompleted) {
-            result.success(0)
-          }
+            result.success(currentMax)
         }
 
         override def onStreamError(e: Exception): Unit = {
