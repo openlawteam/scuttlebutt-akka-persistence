@@ -16,7 +16,7 @@ class ScuttlebuttReadJournalProvider(system: ExtendedActorSystem, config: Config
     val multiplexerLoader =  new MultiplexerLoader(objectMapper, config)
     val scuttlebuttDriver = new ScuttlebuttDriver(multiplexerLoader.loadMultiplexer, objectMapper)
 
-    new ScuttlebuttReadJournal(config, scuttlebuttDriver, objectMapper)
+    new ScuttlebuttReadJournal(system, config, scuttlebuttDriver, objectMapper)
   }
 
   override def javadslReadJournal(): javadsl.ReadJournal = {

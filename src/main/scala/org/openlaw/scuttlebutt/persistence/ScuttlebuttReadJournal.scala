@@ -1,7 +1,8 @@
 package org.openlaw.scuttlebutt.persistence
 
 import akka.NotUsed
-import akka.persistence.PersistentRepr
+import akka.actor.ExtendedActorSystem
+import akka.persistence.{Persistence, PersistentRepr}
 import akka.persistence.query.{EventEnvelope, Sequence}
 import akka.persistence.query.scaladsl.ReadJournal
 import akka.stream.scaladsl.{Flow, Source}
@@ -18,10 +19,14 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 
-class ScuttlebuttReadJournal(config: Config,
-                             scuttlebuttDriver: ScuttlebuttDriver,
-                             objectMapper: ObjectMapper) extends ReadJournal {
+class ScuttlebuttReadJournal(
+                              system: ExtendedActorSystem,
+                              config: Config,
+                              scuttlebuttDriver: ScuttlebuttDriver,
+                              objectMapper: ObjectMapper) extends ReadJournal {
 
+
+  val eventAdapters = Persistence(system).adaptersFor("scuttlebutt-journal")
 
   val rangeFiller = new ScuttlebuttStreamRangeFiller(scuttlebuttDriver, objectMapper)
 
@@ -43,14 +48,14 @@ class ScuttlebuttReadJournal(config: Config,
       }
     }
 
-    eventSource.flatMapConcat( events => Source.fromIterator( () => events.iterator ))
+    eventSource.flatMapConcat(events => Source.fromIterator(() => events.iterator))
   }
 
   private def pollUntilAvailable(persistenceId: String, start: Long, max: Long, end: Long): Future[Seq[EventEnvelope]] = {
     // Scuttlebutt does not implement back pressure so (like many other persistence plugins) we have to poll until
     // more is available
 
-    rangeFiller.getEventMessages( persistenceId, start, max, end ).map(events => events.map(toEnvelope)).flatMap {
+    rangeFiller.getEventMessages(persistenceId, start, max, end).map(events => events.map(toEnvelope)).flatMap {
       case events if events.isEmpty => {
 
         // TODO: use configured timeout
@@ -68,20 +73,19 @@ class ScuttlebuttReadJournal(config: Config,
     val content: JsonNode = node.findPath("content")
     val payload: JsonNode = content.findPath("payload")
 
-    val persistentRepr : PersistentRepr = objectMapper.treeToValue(content, classOf[PersistedMessage])
+    val persistentRepr: PersistentRepr = objectMapper.treeToValue(content, classOf[PersistedMessage])
+
+    val eventAdapter = eventAdapters.get(payload.getClass)
+
+    val deserializedPayload = eventAdapter.fromJournal(payload, persistentRepr.manifest).events.head
 
     new EventEnvelope(
       Sequence(persistentRepr.sequenceNr),
       persistentRepr.persistenceId,
       persistentRepr.sequenceNr,
-      payload
+      deserializedPayload
     )
   }
-
-
-
-
-
 
 
 }
