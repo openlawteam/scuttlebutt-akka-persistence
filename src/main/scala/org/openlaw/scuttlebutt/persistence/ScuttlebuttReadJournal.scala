@@ -3,7 +3,7 @@ package org.openlaw.scuttlebutt.persistence
 import akka.NotUsed
 import akka.actor.ExtendedActorSystem
 import akka.persistence.{Persistence, PersistentRepr}
-import akka.persistence.query.{EventEnvelope, Sequence}
+import akka.persistence.query.{EventEnvelope, Offset, Sequence}
 import akka.persistence.query.scaladsl.ReadJournal
 import akka.stream.scaladsl.{Flow, Source}
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
@@ -23,16 +23,20 @@ class ScuttlebuttReadJournal(
                               system: ExtendedActorSystem,
                               config: Config,
                               scuttlebuttDriver: ScuttlebuttDriver,
-                              objectMapper: ObjectMapper) extends ReadJournal {
+                              objectMapper: ObjectMapper) extends ReadJournal
+  with akka.persistence.query.scaladsl.EventsByTagQuery
+  with akka.persistence.query.scaladsl.EventsByPersistenceIdQuery
+  with akka.persistence.query.scaladsl.PersistenceIdsQuery
+  with akka.persistence.query.scaladsl.CurrentPersistenceIdsQuery {
 
 
   val eventAdapters = Persistence(system).adaptersFor("scuttlebutt-journal")
 
   val rangeFiller = new ScuttlebuttStreamRangeFiller(scuttlebuttDriver, objectMapper)
 
-  def eventsByPersistenceId(
-                             persistenceId: String, fromSequenceNr: Long,
-                             toSequenceNr: Long): Source[EventEnvelope, NotUsed] = {
+  override def eventsByPersistenceId(
+                                      persistenceId: String, fromSequenceNr: Long,
+                                      toSequenceNr: Long): Source[EventEnvelope, NotUsed] = {
 
     val step = config.getInt("max-buffer-size")
 
@@ -50,6 +54,13 @@ class ScuttlebuttReadJournal(
 
     eventSource.flatMapConcat(events => Source.fromIterator(() => events.iterator))
   }
+
+  override def persistenceIds(): Source[String, NotUsed] = ???
+
+  override def eventsByTag(
+                            tag: String, offset: Offset = Sequence(0L)): Source[EventEnvelope, NotUsed] = ???
+
+  override def currentPersistenceIds(): Source[String, NotUsed] = ???
 
   private def pollUntilAvailable(persistenceId: String, start: Long, max: Long, end: Long): Future[Seq[EventEnvelope]] = {
     // Scuttlebutt does not implement back pressure so (like many other persistence plugins) we have to poll until
@@ -85,6 +96,5 @@ class ScuttlebuttReadJournal(
       deserializedPayload
     )
   }
-
 
 }
