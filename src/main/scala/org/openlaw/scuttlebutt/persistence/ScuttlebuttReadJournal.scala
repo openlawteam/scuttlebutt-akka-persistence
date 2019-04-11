@@ -5,7 +5,7 @@ import akka.actor.ExtendedActorSystem
 import akka.persistence.{Persistence, PersistentRepr}
 import akka.persistence.query.{EventEnvelope, Offset, Sequence}
 import akka.persistence.query.scaladsl.ReadJournal
-import akka.stream.scaladsl.{Flow, Source}
+import akka.stream.scaladsl.{Source}
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.typesafe.config.Config
@@ -14,9 +14,9 @@ import org.openlaw.scuttlebutt.persistence.driver.ScuttlebuttDriver
 import org.openlaw.scuttlebutt.persistence.reader.ScuttlebuttStreamRangeFiller
 import org.openlaw.scuttlebutt.persistence.serialization.PersistedMessage
 
-import scala.collection.immutable.NumericRange
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.util.{Success, Failure}
 
 
 class ScuttlebuttReadJournal(
@@ -57,10 +57,18 @@ class ScuttlebuttReadJournal(
 
   override def persistenceIds(): Source[String, NotUsed] = ???
 
+  override def currentPersistenceIds(): Source[String, NotUsed] = {
+
+    val currentPersistenceIds = scuttlebuttDriver.currentPersistenceIds()
+
+    Source.fromFuture(currentPersistenceIds).flatMapConcat{
+      case Success(values) => Source.fromIterator(() => values.iterator)
+      case Failure(exception) => Source.failed(exception)
+    }
+  }
+
   override def eventsByTag(
                             tag: String, offset: Offset = Sequence(0L)): Source[EventEnvelope, NotUsed] = ???
-
-  override def currentPersistenceIds(): Source[String, NotUsed] = ???
 
   private def pollUntilAvailable(persistenceId: String, start: Long, max: Long, end: Long): Future[Seq[EventEnvelope]] = {
     // Scuttlebutt does not implement back pressure so (like many other persistence plugins) we have to poll until

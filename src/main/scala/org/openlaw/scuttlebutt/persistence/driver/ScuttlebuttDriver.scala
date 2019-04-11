@@ -3,13 +3,9 @@ package org.openlaw.scuttlebutt.persistence.driver
 import java.util
 import java.util.function.Function
 
-import akka.NotUsed
 import akka.persistence.PersistentRepr
-import akka.persistence.query.EventEnvelope
-import akka.stream.OverflowStrategy
-import akka.stream.scaladsl.Source
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.{ObjectMapper}
+import com.fasterxml.jackson.databind.node.{ObjectNode}
 import com.google.common.base.Optional
 import net.consensys.cava.concurrent.AsyncResult
 import net.consensys.cava.scuttlebutt.rpc._
@@ -29,12 +25,30 @@ class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
   }
 
   // TODO: better query representation than an ObjectNode
-  def openQueryStream(query: ObjectNode, streamHandler: Function[Runnable, ScuttlebuttStreamHandler] ) = {
-    var function: RPCFunction = new RPCFunction(util.Arrays.asList("query"), "read")
+  def openQueryStream(query: ObjectNode, streamHandler: Function[Runnable, ScuttlebuttStreamHandler]) = {
+    val function: RPCFunction = new RPCFunction(util.Arrays.asList("query"), "read")
     val request: RPCStreamRequest = new RPCStreamRequest(function, util.Arrays.asList(query))
 
     multiplexer.openStream(request, streamHandler)
   }
+
+  def currentPersistenceIds(): Future[Try[List[String]]] = {
+    val function: RPCFunction = new RPCFunction(
+      util.Arrays.asList("akkaPersistenceIndex"),
+      "currentPersistenceIdsAsync")
+
+    val request: RPCAsyncRequest = new RPCAsyncRequest(function, util.Arrays.asList())
+
+    multiplexer.makeAsyncRequest(request).map {
+      case rpcMessage if !rpcMessage.isErrorMessage => Success(rpcMessage.asJSON(objectMapper, classOf[List[String]]))
+      case rpcMessage => {
+        val errorMsg = rpcMessage.getErrorBody(objectMapper).transform(msg => msg.getMessage).or(rpcMessage.asString())
+        Failure(new Exception(errorMsg))
+      }
+    }
+
+  }
+
 
   private def makeRPCMessage(persistentRep: PersistentRepr): RPCAsyncRequest = {
     val func: RPCFunction = new RPCFunction("publish")

@@ -14,7 +14,7 @@ case class ExampleState(events: List[String] = Nil) {
 }
 
 class ScuttlebuttPersistentActorExample extends PersistentActor {
-  override def persistenceId = "sample-id-4"
+  override def persistenceId = "sample-id-6"
 
   var state = ExampleState()
 
@@ -51,9 +51,12 @@ object ScuttlebuttPersistentActorExampleTest {
     // default Actor constructor
     val helloActor = system.actorOf(Props[ScuttlebuttPersistentActorExample], name = "persist-test-actor")
 
-    helloActor ! Cmd("Test")
-
-    helloActor ! "print"
+    var i = 0
+    while (i < 20) {
+      helloActor ! Cmd("Test")
+      helloActor ! "print"
+      i = i + 1
+    }
   }
 
 }

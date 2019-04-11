@@ -22,10 +22,14 @@ object ReadJournalExample {
     )
 
     val source = readJournal.eventsByPersistenceId(
-      "sample-id-4", 0, 11
+      "sample-id-6", 0, 11
     )
 
     source.runWith(Sink.foreach(println))
+
+    val allPersistenceIdsSource = readJournal.currentPersistenceIds()
+
+    allPersistenceIdsSource.runWith(Sink.foreach(println))
 
   }
 
