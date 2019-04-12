@@ -25,3 +25,5 @@ libraryDependencies += "org.logl" % "logl-api" % "0.4.0-24B971-snapshot"
 libraryDependencies += "net.consensys.cava" % "cava" % "1.0.0-B67A22-snapshot"
 
 libraryDependencies += "com.github.jnr" % "jnr-ffi" % "2.1.9"
+
+libraryDependencies += "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.9.8"

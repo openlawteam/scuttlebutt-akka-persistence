@@ -1,6 +1,7 @@
 package org.openlaw.scuttlebutt.persistence.serialization
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 
@@ -11,7 +12,7 @@ class ScuttlebuttPersistenceSerializationConfig() {
 
 
   def getObjectMapper() = {
-    mapper
+    mapper.registerModule(new JavaTimeModule());
   }
 
 }
