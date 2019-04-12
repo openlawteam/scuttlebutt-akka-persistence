@@ -7,8 +7,6 @@ import akka.persistence.query.{EventEnvelope, PersistenceQuery}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future}
 
 object ReadJournalExample {
 
@@ -21,8 +19,8 @@ object ReadJournalExample {
       "org.openlaw.scuttlebutt.journal.persistence"
     )
 
-    val source = readJournal.eventsByPersistenceId(
-      "sample-id-6", 0, 11
+    val source = readJournal.currentEventsByPersistenceId(
+      "sample-id-6", 0, 30
     )
 
     source.runWith(Sink.foreach(println))

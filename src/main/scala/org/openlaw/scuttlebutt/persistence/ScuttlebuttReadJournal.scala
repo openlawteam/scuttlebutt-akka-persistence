@@ -26,6 +26,7 @@ class ScuttlebuttReadJournal(
                               objectMapper: ObjectMapper) extends ReadJournal
   with akka.persistence.query.scaladsl.EventsByTagQuery
   with akka.persistence.query.scaladsl.EventsByPersistenceIdQuery
+  with akka.persistence.query.scaladsl.CurrentEventsByPersistenceIdQuery
   with akka.persistence.query.scaladsl.PersistenceIdsQuery
   with akka.persistence.query.scaladsl.CurrentPersistenceIdsQuery {
 
@@ -34,10 +35,21 @@ class ScuttlebuttReadJournal(
 
   val rangeFiller = new ScuttlebuttStreamRangeFiller(scuttlebuttDriver, objectMapper)
 
+  override def currentEventsByPersistenceId(persistenceId: String, fromSequenceNr: Long, toSequenceNr: Long): Source[EventEnvelope, NotUsed] = {
+    eventsByPersistenceIdSource(persistenceId, fromSequenceNr, toSequenceNr, false)
+  }
+
   override def eventsByPersistenceId(
                                       persistenceId: String, fromSequenceNr: Long,
                                       toSequenceNr: Long): Source[EventEnvelope, NotUsed] = {
+    eventsByPersistenceIdSource(persistenceId, fromSequenceNr, toSequenceNr, true)
+  }
 
+  private def eventsByPersistenceIdSource(
+                                   persistenceId: String,
+                                   fromSequenceNr: Long,
+                                   toSequenceNr: Long,
+                                   live: Boolean): Source[EventEnvelope, NotUsed] = {
     val step = config.getInt("max-buffer-size")
 
     val eventSource = Source.unfoldAsync[Long, Seq[EventEnvelope]](0) {
@@ -46,14 +58,24 @@ class ScuttlebuttReadJournal(
       case start => {
         val end = Math.min(start + step, toSequenceNr)
 
-        pollUntilAvailable(persistenceId, start, step, end).map(
-          results => Some((start + results.length) -> results)
-        )
+        if (live) {
+          pollUntilAvailable(persistenceId, start, step, end).map(
+            results => Some((start + results.length) -> results)
+          )
+        } else {
+          rangeFiller.getEventMessages(persistenceId, start, step, end)
+            .map(rpcMessages => rpcMessages.map(toEnvelope)).map {
+            case events if events.isEmpty => None
+            case events => Some((start + events.length) -> events)
+          }
+
+        }
       }
     }
 
     eventSource.flatMapConcat(events => Source.fromIterator(() => events.iterator))
   }
+
 
   override def persistenceIds(): Source[String, NotUsed] = ???
 
@@ -61,7 +83,7 @@ class ScuttlebuttReadJournal(
 
     val currentPersistenceIds = scuttlebuttDriver.currentPersistenceIds()
 
-    Source.fromFuture(currentPersistenceIds).flatMapConcat{
+    Source.fromFuture(currentPersistenceIds).flatMapConcat {
       case Success(values) => Source.fromIterator(() => values.iterator)
       case Failure(exception) => Source.failed(exception)
     }
