@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 class QueryBuilder(objectMapper: ObjectMapper) {
 
 
-
   def makeReplayQuery(
                        persistenceId: String,
                        fromSequenceNr: Long,
@@ -36,8 +35,9 @@ class QueryBuilder(objectMapper: ObjectMapper) {
           Map("$filter" ->
             Map("value" ->
               Map("content" -> Map(
-                ("type" -> persistenceId),
-                ("sequenceNr" -> rangeFilter)
+                ("persistenceId" -> persistenceId),
+                ("sequenceNr" -> rangeFilter),
+                ("type" -> "akka-persistence-message")
               )
               ))
           ),

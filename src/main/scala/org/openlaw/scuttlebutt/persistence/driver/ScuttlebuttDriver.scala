@@ -4,9 +4,10 @@ import java.util
 import java.util.function.Function
 
 import akka.persistence.PersistentRepr
-import com.fasterxml.jackson.databind.{ObjectMapper}
-import com.fasterxml.jackson.databind.node.{ObjectNode}
+import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
+import com.fasterxml.jackson.databind.node.{JsonNodeFactory, ObjectNode}
 import com.google.common.base.Optional
+import jdk.internal.org.objectweb.asm.TypeReference
 import net.consensys.cava.concurrent.AsyncResult
 import net.consensys.cava.scuttlebutt.rpc._
 import net.consensys.cava.scuttlebutt.rpc.mux.exceptions.ConnectionClosedException
@@ -54,7 +55,10 @@ class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
     val func: RPCFunction = new RPCFunction("publish")
     val repWithClassName: PersistentRepr = persistentRep.withManifest(persistentRep.payload.getClass.getName)
     val reqBody: ObjectNode = objectMapper.valueToTree(repWithClassName)
-    reqBody.set("type", reqBody.get("persistenceId"))
+
+    val typeNode = JsonNodeFactory.instance.textNode("akka-persistence-message")
+
+    reqBody.set("type", typeNode)
 
     new RPCAsyncRequest(func, util.Arrays.asList(reqBody))
   }
