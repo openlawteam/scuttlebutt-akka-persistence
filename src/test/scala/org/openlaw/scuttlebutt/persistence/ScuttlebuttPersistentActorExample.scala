@@ -53,7 +53,7 @@ object ScuttlebuttPersistentActorExampleTest {
 
     var i = 0
     while (i < 20) {
-      helloActor ! Cmd("Test")
+      helloActor ! Cmd("new-test")
       helloActor ! "print"
       i = i + 1
     }

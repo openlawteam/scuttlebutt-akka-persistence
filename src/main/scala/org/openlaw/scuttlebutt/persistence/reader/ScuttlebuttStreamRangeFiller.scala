@@ -8,6 +8,12 @@ import org.openlaw.scuttlebutt.persistence.query.QueryBuilder
 
 import scala.concurrent.{Future, Promise}
 
+/**
+  * Provides helper methods to consume a scuttlebutt stream into an array
+  *
+  * @param driver the scuttlebutt driver for making requests
+  * @param objectMapper the object mapper for deserialization
+  */
 class ScuttlebuttStreamRangeFiller(
                                     driver: ScuttlebuttDriver,
                                       objectMapper: ObjectMapper,
@@ -15,6 +21,15 @@ class ScuttlebuttStreamRangeFiller(
 
   val queryBuilder = new QueryBuilder(objectMapper)
 
+  /**
+    *
+    * @param persistenceId the persistence ID for the messages
+    * @param fromSequenceNr the start sequence number (inclusive.)
+    * @param max the maximum number of results to fetch
+    * @param toSequenceNr the end sequence number (inclusive.)
+    * @return a future which will be populated with only successful RPC messages, or completed exceptionally if
+    *         the request failed for any reason
+    */
   def getEventMessages(persistenceId: String,
                        fromSequenceNr: Long,
                        max: Long,
@@ -29,16 +44,7 @@ class ScuttlebuttStreamRangeFiller(
         var results: Seq[RPCMessage] = Seq()
 
         override def onMessage(message: RPCMessage): Unit = {
-
-          if (!message.isErrorMessage) {
             results = results :+ message
-          } else {
-            val errorMessage = message.getErrorBody(objectMapper)
-              .transform(errorBody => errorBody.getMessage)
-              .or(message.asString())
-
-            promise.failure(new Exception(errorMessage))
-          }
         }
 
         override def onStreamEnd(): Unit = {

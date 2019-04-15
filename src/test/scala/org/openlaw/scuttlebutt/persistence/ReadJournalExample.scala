@@ -24,6 +24,13 @@ object ReadJournalExample {
     )
 
     source.runWith(Sink.foreach(println))
+    source.runWith(Sink.foreach(println))
+    source.runWith(Sink.foreach(println))
+    source.runWith(Sink.foreach(println))
+    source.runWith(Sink.foreach(println))
+    source.runWith(Sink.foreach(println))
+    source.runWith(Sink.foreach(println))
+    source.runWith(Sink.foreach(println))
 
     val allPersistenceIdsSource = readJournal.currentPersistenceIds()
 
