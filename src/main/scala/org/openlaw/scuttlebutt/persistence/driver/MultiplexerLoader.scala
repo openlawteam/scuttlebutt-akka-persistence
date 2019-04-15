@@ -28,7 +28,7 @@ class MultiplexerLoader(objectMapper: ObjectMapper, scuttlebuttConf: Config) {
     */
   def loadMultiplexer: RPCHandler = {
 
-    val keyPair: Option[Signature.KeyPair] = KeyUtils.getLocalKeys()
+    val keyPair = getKeys()
 
     val networkKey = scuttlebuttConf.getString("networkKey")
 
@@ -57,6 +57,15 @@ class MultiplexerLoader(objectMapper: ObjectMapper, scuttlebuttConf: Config) {
     })
 
     onConnect.get()
+  }
+
+  private def getKeys(): Option[Signature.KeyPair] = {
+    if (scuttlebuttConf.hasPath("secret.path")) {
+      KeyUtils.getKeysAtPath(scuttlebuttConf.getString("scuttlebutt-journal.secret.path"))
+    }
+    else {
+      KeyUtils.getLocalKeys()
+    }
   }
 
 }
