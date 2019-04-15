@@ -85,7 +85,7 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
 
     scuttlebuttDriver.openQueryStream(query, (closer: Runnable) => {
       new ScuttlebuttStreamHandler() {
-        override def onMessage(rpcMessage: RPCMessage): Unit = {
+        override def onMessage(rpcMessage: RPCResponse): Unit = {
           val node: ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])
           val content: JsonNode = node.findPath("content")
 

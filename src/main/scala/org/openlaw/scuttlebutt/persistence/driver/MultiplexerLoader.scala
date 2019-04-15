@@ -51,7 +51,7 @@ class MultiplexerLoader(objectMapper: ObjectMapper, scuttlebuttConf: Config) {
     val secureScuttlebuttVertxClient = new SecureScuttlebuttVertxClient(loggerProvider, vertx, localKeys, networkKeyBytes32)
 
     val onConnect: AsyncResult[RPCHandler] = secureScuttlebuttVertxClient.connectTo(port, host, localKeys.publicKey, (sender: Consumer[Bytes], terminationFn: Runnable) => {
-      def makeHandler(sender: Consumer[Bytes], terminationFn: Runnable) = new RPCHandler(sender, terminationFn, objectMapper, loggerProvider)
+      def makeHandler(sender: Consumer[Bytes], terminationFn: Runnable) = new RPCHandler(vertx, sender, terminationFn, objectMapper, loggerProvider)
 
       makeHandler(sender, terminationFn)
     })

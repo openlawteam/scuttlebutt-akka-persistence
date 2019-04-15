@@ -3,7 +3,7 @@ package org.openlaw.scuttlebutt.persistence
 import akka.persistence.PersistentRepr
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.fasterxml.jackson.databind.node.ObjectNode
-import net.consensys.cava.scuttlebutt.rpc.RPCMessage
+import net.consensys.cava.scuttlebutt.rpc.{RPCMessage, RPCResponse}
 import net.consensys.cava.scuttlebutt.rpc.mux.ScuttlebuttStreamHandler
 import org.openlaw.scuttlebutt.persistence.serialization.PersistedMessage
 
@@ -16,7 +16,7 @@ class PersistentReprStreamHandler(
                                    finishedPromise: Promise[Unit])
   extends ScuttlebuttStreamHandler {
 
-  override def onMessage(rpcMessage: RPCMessage): Unit = {
+  override def onMessage(rpcMessage: RPCResponse): Unit = {
     val node:ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])
     val content: JsonNode = node.findPath("content")
     val payload: JsonNode = content.findPath("payload")
