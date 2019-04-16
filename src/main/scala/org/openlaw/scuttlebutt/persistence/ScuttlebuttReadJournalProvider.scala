@@ -10,7 +10,14 @@ import org.openlaw.scuttlebutt.persistence.serialization.ScuttlebuttPersistenceS
 class ScuttlebuttReadJournalProvider(system: ExtendedActorSystem, config: Config) extends ReadJournalProvider {
 
   override def scaladslReadJournal(): ReadJournal = {
+    scalaJournal()
+  }
 
+  override def javadslReadJournal(): javadsl.ReadJournal = {
+    new ScuttlebuttJavaReadJournalProvider(scalaJournal())
+  }
+
+  private def scalaJournal(): ScuttlebuttReadJournal = {
     val objectMapper = new ScuttlebuttPersistenceSerializationConfig().mapper
 
     val multiplexerLoader =  new MultiplexerLoader(objectMapper, config)
@@ -19,8 +26,4 @@ class ScuttlebuttReadJournalProvider(system: ExtendedActorSystem, config: Config
     new ScuttlebuttReadJournal(system, config, scuttlebuttDriver, objectMapper)
   }
 
-  override def javadslReadJournal(): javadsl.ReadJournal = {
-    null
-
-  }
 }
