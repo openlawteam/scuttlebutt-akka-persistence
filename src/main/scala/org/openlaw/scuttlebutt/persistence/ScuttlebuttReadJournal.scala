@@ -9,7 +9,7 @@ import akka.stream.scaladsl.{Source}
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.typesafe.config.Config
-import net.consensys.cava.scuttlebutt.rpc.RPCMessage
+import net.consensys.cava.scuttlebutt.rpc.RPCResponse
 import org.openlaw.scuttlebutt.persistence.driver.ScuttlebuttDriver
 import org.openlaw.scuttlebutt.persistence.reader.ScuttlebuttStreamRangeFiller
 import org.openlaw.scuttlebutt.persistence.serialization.PersistedMessage
@@ -107,7 +107,7 @@ class ScuttlebuttReadJournal(
   }
 
 
-  private def toEnvelope(rpcMessage: RPCMessage): EventEnvelope = {
+  private def toEnvelope(rpcMessage: RPCResponse): EventEnvelope = {
     val node: ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])
 
     val content: JsonNode = node.findPath("content")

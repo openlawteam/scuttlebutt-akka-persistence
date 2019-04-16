@@ -47,7 +47,7 @@ scuttlebutt-journal {
     port = 8008
     # The network key (defaults to the default key used by scuttlebutt applications)
     networkKey = "1KHLiKZvAvjbY1ziZEHMXawbCEIM6qwjCDm3VYRan/s="
-    
+
 }
 
 # Read journal configuration

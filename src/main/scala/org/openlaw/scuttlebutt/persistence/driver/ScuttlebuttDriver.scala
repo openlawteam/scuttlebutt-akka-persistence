@@ -6,8 +6,6 @@ import java.util.function.Function
 import akka.persistence.PersistentRepr
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.fasterxml.jackson.databind.node.{JsonNodeFactory, ObjectNode}
-import com.google.common.base.Optional
-import jdk.internal.org.objectweb.asm.TypeReference
 import net.consensys.cava.concurrent.AsyncResult
 import net.consensys.cava.scuttlebutt.rpc._
 import net.consensys.cava.scuttlebutt.rpc.mux.exceptions.ConnectionClosedException
@@ -40,12 +38,8 @@ class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
 
     val request: RPCAsyncRequest = new RPCAsyncRequest(function, util.Arrays.asList())
 
-    multiplexer.makeAsyncRequest(request).map {
-      case rpcMessage if !rpcMessage.isErrorMessage => Success(rpcMessage.asJSON(objectMapper, classOf[List[String]]))
-      case rpcMessage => {
-        val errorMsg = rpcMessage.getErrorBody(objectMapper).transform(msg => msg.getMessage).or(rpcMessage.asString())
-        Failure(new Exception(errorMsg))
-      }
+    multiplexer.makeAsyncRequest(request).map(result => Success(result.asJSON(objectMapper, classOf[List[String]]) )).recover {
+      case exception => Failure(exception)
     }
 
   }
@@ -65,22 +59,13 @@ class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
 
   private def doScuttlebuttPublish(request: RPCAsyncRequest): Future[Try[Unit]] = {
 
-    val rpcResult: AsyncResult[RPCMessage] = multiplexer.makeAsyncRequest(request)
-    val resultFuture: Future[RPCMessage] = asyncResultToFuture(rpcResult)
+    val rpcResult: AsyncResult[RPCResponse] = multiplexer.makeAsyncRequest(request)
+    val resultFuture: Future[RPCResponse] = asyncResultToFuture(rpcResult)
 
-    resultFuture.map(
-      result => {
-        if (result.lastMessageOrError()) {
-          val message: Optional[RPCErrorBody] = result.getErrorBody(objectMapper)
-          val exception = message.transform(body => new Exception(body.getMessage)).or(new Exception(result.asString()))
-          Failure(exception)
-        } else {
-          Success()
-        }
-      }
-    ).recover({
+    // Success if the future wasn't failed
+    resultFuture.map(_ => Success()).recover({
       // The AsyncWriteJournal interface requires that we only complete the future with an exception if it's
-      // a connection break that is the underlying cause, otherwise we return a 'Try' Failure
+      // a connection break that is the underlying cause, otherwise we return a 'Try' Failure.
       case x if !x.isInstanceOf[ConnectionClosedException] => Failure(x)
     })
 
