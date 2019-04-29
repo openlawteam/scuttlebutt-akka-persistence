@@ -51,12 +51,14 @@ object ScuttlebuttPersistentActorExampleTest {
     // default Actor constructor
     val helloActor = system.actorOf(Props[ScuttlebuttPersistentActorExample], name = "persist-test-actor")
 
-    var i = 0
-    while (i < 20) {
-      helloActor ! Cmd("new-test")
-      helloActor ! "print"
-      i = i + 1
-    }
+    helloActor ! "print"
+//
+//    var i = 0
+//    while (i < 20) {
+//      helloActor ! Cmd("new-test")
+//      helloActor ! "print"
+//      i = i + 1
+//    }
   }
 
 }

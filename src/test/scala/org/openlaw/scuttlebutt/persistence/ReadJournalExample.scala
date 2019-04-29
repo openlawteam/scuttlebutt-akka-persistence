@@ -20,17 +20,17 @@ object ReadJournalExample {
     )
 
     val source = readJournal.currentEventsByPersistenceId(
-      "persistence-id-goes-here", 0, 30
+      "sample-id-6", 0, 30
     )
 
     source.runWith(Sink.foreach(println))
-    source.runWith(Sink.foreach(println))
-    source.runWith(Sink.foreach(println))
-    source.runWith(Sink.foreach(println))
-    source.runWith(Sink.foreach(println))
-    source.runWith(Sink.foreach(println))
-    source.runWith(Sink.foreach(println))
-    source.runWith(Sink.foreach(println))
+//    source.runWith(Sink.foreach(println))
+//    source.runWith(Sink.foreach(println))
+//    source.runWith(Sink.foreach(println))
+//    source.runWith(Sink.foreach(println))
+//    source.runWith(Sink.foreach(println))
+//    source.runWith(Sink.foreach(println))
+//    source.runWith(Sink.foreach(println))
 
     val allPersistenceIdsSource = readJournal.currentPersistenceIds()
 

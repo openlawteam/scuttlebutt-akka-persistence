@@ -108,9 +108,8 @@ class ScuttlebuttReadJournal(
 
 
   private def toEnvelope(rpcMessage: RPCResponse): EventEnvelope = {
-    val node: ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])
+    val content: ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])
 
-    val content: JsonNode = node.findPath("content")
     val payload: JsonNode = content.findPath("payload")
 
     val persistentRepr: PersistentRepr = objectMapper.treeToValue(content, classOf[PersistedMessage])

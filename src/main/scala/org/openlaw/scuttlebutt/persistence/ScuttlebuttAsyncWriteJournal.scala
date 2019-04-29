@@ -8,7 +8,7 @@ import com.typesafe.config.Config
 import net.consensys.cava.scuttlebutt.rpc.mux.{RPCHandler, ScuttlebuttStreamHandler}
 import net.consensys.cava.scuttlebutt.rpc._
 import org.openlaw.scuttlebutt.persistence.driver.{MultiplexerLoader, ScuttlebuttDriver}
-import org.openlaw.scuttlebutt.persistence.query.QueryBuilder
+
 import org.openlaw.scuttlebutt.persistence.serialization.{PersistedMessage, ScuttlebuttPersistenceSerializationConfig}
 
 import scala.collection.immutable
@@ -23,8 +23,6 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
 
   val rpcHandler: RPCHandler = loader.loadMultiplexer
   val scuttlebuttDriver: ScuttlebuttDriver = new ScuttlebuttDriver(rpcHandler, objectMapper)
-
-  val queryBuilder = new QueryBuilder(objectMapper)
 
   override def asyncWriteMessages(messages: immutable.Seq[AtomicWrite]): Future[immutable.Seq[Try[Unit]]] = {
 
@@ -64,9 +62,7 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
   ) = {
     val finishedReplaysPromise = Promise[Unit]();
 
-    val query = queryBuilder.makeReplayQuery(persistenceId, fromSequenceNr, toSequenceNr, max, false)
-
-    scuttlebuttDriver.openQueryStream(query, (closer: Runnable) => {
+    scuttlebuttDriver.myEventsByPersistenceId(persistenceId, fromSequenceNr, toSequenceNr, (closer: Runnable) => {
       new PersistentReprStreamHandler(objectMapper, closer, recoveryCallback, finishedReplaysPromise)
     })
 
@@ -74,37 +70,7 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
   }
 
   override def asyncReadHighestSequenceNr(persistenceId: String, fromSequenceNr: Long): Future[Long] = {
-    // There is a ssb-query bug whereby 'reverse' is ignored if a sort value is specified preventing us
-    // doing this the smart way (with a query that has a limit of 1, sorts in descending and a limit of 1,
-    // we work around by reading the full stream to the end for now as a workaround
-
-    val result = Promise[Long]()
-    val query = queryBuilder.makeReplayQuery(persistenceId, fromSequenceNr, Long.MaxValue, reverse = false)
-
-    var currentMax = 0l
-
-    scuttlebuttDriver.openQueryStream(query, (closer: Runnable) => {
-      new ScuttlebuttStreamHandler() {
-        override def onMessage(rpcMessage: RPCResponse): Unit = {
-          val node: ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])
-          val content: JsonNode = node.findPath("content")
-
-          val responseBody: PersistentRepr = objectMapper.treeToValue(content, classOf[PersistedMessage])
-
-          currentMax = responseBody.sequenceNr
-        }
-
-        override def onStreamEnd(): Unit = {
-            result.success(currentMax)
-        }
-
-        override def onStreamError(e: Exception): Unit = {
-          result.failure(e)
-        }
-      }
-    })
-
-    return result.future
+    scuttlebuttDriver.getHighestSequenceNr(persistenceId)
   }
 
 }

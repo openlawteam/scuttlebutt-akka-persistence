@@ -17,8 +17,7 @@ class PersistentReprStreamHandler(
   extends ScuttlebuttStreamHandler {
 
   override def onMessage(rpcMessage: RPCResponse): Unit = {
-    val node:ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])
-    val content: JsonNode = node.findPath("content")
+    val content:ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])
     val payload: JsonNode = content.findPath("payload")
 
     val persistentRepr : PersistentRepr = objectMapper.treeToValue(content, classOf[PersistedMessage])

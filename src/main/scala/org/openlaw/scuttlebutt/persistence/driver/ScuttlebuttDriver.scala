@@ -10,6 +10,7 @@ import net.consensys.cava.concurrent.AsyncResult
 import net.consensys.cava.scuttlebutt.rpc._
 import net.consensys.cava.scuttlebutt.rpc.mux.exceptions.ConnectionClosedException
 import net.consensys.cava.scuttlebutt.rpc.mux.{Multiplexer, ScuttlebuttStreamHandler}
+import org.openlaw.scuttlebutt.persistence.converters.FutureConverters
 import org.openlaw.scuttlebutt.persistence.converters.FutureConverters.asyncResultToFuture
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -22,6 +23,50 @@ class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
     val message = makeRPCMessage(persistentRepr)
     doScuttlebuttPublish(message)
   }
+
+  def getHighestSequenceNr(persistenceId: String): Future[Long] = {
+    val function: RPCFunction = new RPCFunction(util.Arrays.asList("akkaPersistenceIndex"), "highestSequenceNumber")
+    val request: RPCAsyncRequest = new RPCAsyncRequest(function, util.Arrays.asList(null, persistenceId))
+
+    val response: Future[RPCResponse] = multiplexer.makeAsyncRequest(request)
+
+    response.map(result => {
+      var intResult = result.asJSON[Long](objectMapper, classOf[Long])
+      print("Result is... " + intResult)
+
+      intResult
+    })
+  }
+
+  def myEventsByPersistenceId(persistenceId: String,
+                              fromSequenceNr: Long,
+                              toSequenceNr: Long,
+                              handler: Function[Runnable, ScuttlebuttStreamHandler]) = {
+
+
+    // 'null' for the author field is a shortcut for 'my ident'.
+    eventsByPersistenceId(null, persistenceId, fromSequenceNr, toSequenceNr, handler)
+  }
+
+  def eventsByPersistenceId(author: String,
+                            persistenceId: String,
+                            fromSequenceNr: Long,
+                            toSequenceNr: Long,
+                            handler: Function[Runnable, ScuttlebuttStreamHandler]) = {
+
+    val function: RPCFunction = new RPCFunction(
+      util.Arrays.asList("akkaPersistenceIndex"),
+      "eventsByPersistenceId")
+
+    val request = new RPCStreamRequest(function, util.Arrays.asList(
+       author.asInstanceOf[Object],
+      persistenceId.asInstanceOf[Object],
+      fromSequenceNr.asInstanceOf[Object],
+      toSequenceNr.asInstanceOf[Object]))
+
+    multiplexer.openStream(request, handler)
+  }
+
 
   // TODO: better query representation than an ObjectNode
   def openQueryStream(query: ObjectNode, streamHandler: Function[Runnable, ScuttlebuttStreamHandler]) = {
