@@ -91,7 +91,8 @@ class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
 
 
   private def makeRPCMessage(persistentRep: PersistentRepr): RPCAsyncRequest = {
-    val func: RPCFunction = new RPCFunction("publish")
+
+    val func: RPCFunction = new RPCFunction(util.Arrays.asList("akkaPersistenceIndex"), "persistEvent")
     val repWithClassName: PersistentRepr = persistentRep.withManifest(persistentRep.payload.getClass.getName)
     val reqBody: ObjectNode = objectMapper.valueToTree(repWithClassName)
 

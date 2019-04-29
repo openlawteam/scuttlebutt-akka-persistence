@@ -6,40 +6,28 @@ package org.openlaw.scuttlebutt.persistence.model
   */
 
 /**
-  * A aes-256-ctr encryption key.
+  * Set a new key for the persistence ID that this message is persisted for. This message
+  * and all future messages will be encrypted.
   *
-  * @param key a base 64 representation of the encryption key (256 bytes)
-  * @param nonce a base 64 representation of the nonce
-  */
-case class Key(key: String, nonce: String)
-
-/**
-  * Changes or sets the key for the persistence ID that this message is persisted for.
+  * This uses aes-256 with a randomly generated 8-byte nonce under the hood. This means there is a
+  * is a 50% likelihood of a collision after about 5.3B encryptions
   *
   * @param key
   */
-case class UpdateKey(key: Key)
+case class UpdateKey()
 
 /**
-  *
+  * Allows a user access to the entity, sending them the current and all previous keys.
   *
   * @param userId the user to allow access of the entity.
   */
 case class AllowAccess(userId: String)
 
 /**
+  * Removes a user from the access list, preventing them from seeing future updates.
   *
-  * @param userId
-  * @param newKey
+  * @param userId the user to remove access to future updates to the entity
   */
-case class RemoveAccess(userId: String, newKey: Key)
-
-object KeyUtils {
-
-  def makeRandomKey() : Key = {
-    null
-  }
-
-}
+case class RemoveAccess(userId: String)
 
 
