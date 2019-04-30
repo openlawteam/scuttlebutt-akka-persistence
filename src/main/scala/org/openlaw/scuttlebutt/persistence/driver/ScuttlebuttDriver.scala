@@ -31,10 +31,7 @@ class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
     val response: Future[RPCResponse] = multiplexer.makeAsyncRequest(request)
 
     response.map(result => {
-      var intResult = result.asJSON[Long](objectMapper, classOf[Long])
-      print("Result is... " + intResult)
-
-      intResult
+      result.asJSON[Long](objectMapper, classOf[Long])
     })
   }
 
