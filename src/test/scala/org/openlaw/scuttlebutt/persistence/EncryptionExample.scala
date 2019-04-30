@@ -2,7 +2,7 @@ package org.openlaw.scuttlebutt.persistence
 
 import akka.actor._
 import akka.persistence.{PersistentActor, _}
-import org.openlaw.scuttlebutt.persistence.model.UpdateKey
+import org.openlaw.scuttlebutt.persistence.model.{AllowAccess, UpdateKey}
 
 case class Cmd(data: String)
 
@@ -43,6 +43,15 @@ class EncryptionPersistentActorExample extends PersistentActor {
       }
     }
 
+    case e: AllowAccess => {
+      persist(e) {
+        event => {
+          updateState(Evt("Added: " + e.userId))
+        }
+      }
+
+    }
+
     case Cmd(data) =>
       persist(Evt(s"${data}-${numEvents}")) { event =>
         updateState(event)
@@ -62,9 +71,11 @@ object EncryptionExample {
     // default Actor constructor
     val helloActor = system.actorOf(Props[EncryptionPersistentActorExample], name = "persist-test-actor")
 
-    //helloActor ! UpdateKey()
+    helloActor ! UpdateKey()
 
     //helloActor ! Cmd("Test test")
+
+    helloActor ! AllowAccess("@XWgsea+zA4x+A0IeC/ajdqn8DoiyMrXGYdHmupL7tX0=.ed25519")
 
     helloActor ! "print"
 
