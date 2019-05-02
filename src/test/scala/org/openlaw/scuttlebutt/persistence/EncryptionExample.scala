@@ -4,16 +4,6 @@ import akka.actor._
 import akka.persistence.{PersistentActor, _}
 import org.openlaw.scuttlebutt.persistence.model.{AllowAccess, UpdateKey}
 
-case class Cmd(data: String)
-
-case class Evt(data: String)
-
-case class ExampleState(events: List[String] = Nil) {
-  def updated(evt: Evt): ExampleState = copy(evt.data :: events)
-  def size: Int = events.length
-  override def toString: String = events.reverse.toString
-}
-
 class EncryptionPersistentActorExample extends PersistentActor {
   override def persistenceId = "sample-encrypted-2"
 

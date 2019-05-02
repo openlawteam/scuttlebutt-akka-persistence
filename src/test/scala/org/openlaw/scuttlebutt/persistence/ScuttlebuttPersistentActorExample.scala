@@ -3,16 +3,6 @@ package org.openlaw.scuttlebutt.persistence
 import akka.actor._
 import akka.persistence.{PersistentActor, _}
 
-case class Cmd(data: String)
-
-case class Evt(data: String)
-
-case class ExampleState(events: List[String] = Nil) {
-  def updated(evt: Evt): ExampleState = copy(evt.data :: events)
-  def size: Int = events.length
-  override def toString: String = events.reverse.toString
-}
-
 class ScuttlebuttPersistentActorExample extends PersistentActor {
   override def persistenceId = "sample-id-6"
 

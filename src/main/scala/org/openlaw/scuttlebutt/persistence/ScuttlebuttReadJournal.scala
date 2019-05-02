@@ -45,25 +45,34 @@ class ScuttlebuttReadJournal(
     eventsByPersistenceIdSource(persistenceId, fromSequenceNr, toSequenceNr, true)
   }
 
+  def eventsByAuthorAndPeristenceId(
+                                     author: String, persistenceId: String, fromSequenceNr: Long,
+                                     toSequenceNr: Long
+                                   ): Source[EventEnvelope, NotUsed] = {
+
+    eventsByPersistenceIdSource(persistenceId, fromSequenceNr, toSequenceNr, true, author)
+  }
+
   private def eventsByPersistenceIdSource(
-                                   persistenceId: String,
-                                   fromSequenceNr: Long,
-                                   toSequenceNr: Long,
-                                   live: Boolean): Source[EventEnvelope, NotUsed] = {
+                                           persistenceId: String,
+                                           fromSequenceNr: Long,
+                                           toSequenceNr: Long,
+                                           live: Boolean,
+                                           author: String = null): Source[EventEnvelope, NotUsed] = {
     val step = config.getInt("max-buffer-size")
 
     val eventSource = Source.unfoldAsync[Long, Seq[EventEnvelope]](0) {
 
-      case start if start > toSequenceNr => Future.successful(None)
+      case start if start >= toSequenceNr => Future.successful(None)
       case start => {
         val end = Math.min(start + step, toSequenceNr)
 
         if (live) {
-          pollUntilAvailable(persistenceId, start, step, end).map(
+          pollUntilAvailable(persistenceId, start, step, end, author).map(
             results => Some((start + results.length) -> results)
           )
         } else {
-          rangeFiller.getEventMessages(persistenceId, start, step, end)
+          rangeFiller.getEventMessages(persistenceId, start, step, end, author)
             .map(rpcMessages => rpcMessages.map(toEnvelope)).map {
             case events if events.isEmpty => None
             case events => Some((start + events.length) -> events)
@@ -92,15 +101,15 @@ class ScuttlebuttReadJournal(
   override def eventsByTag(
                             tag: String, offset: Offset = Sequence(0L)): Source[EventEnvelope, NotUsed] = ???
 
-  private def pollUntilAvailable(persistenceId: String, start: Long, max: Long, end: Long): Future[Seq[EventEnvelope]] = {
+  private def pollUntilAvailable(persistenceId: String, start: Long, max: Long, end: Long, author: String = null): Future[Seq[EventEnvelope]] = {
     // Scuttlebutt does not implement back pressure so (like many other persistence plugins) we have to poll until
     // more is available
 
-    rangeFiller.getEventMessages(persistenceId, start, max, end).map(events => events.map(toEnvelope)).flatMap {
+    rangeFiller.getEventMessages(persistenceId, start, max, end, author).map(events => events.map(toEnvelope)).flatMap {
       case events if events.isEmpty => {
 
         Thread.sleep(config.getDuration("refresh-interval").toMillis)
-        pollUntilAvailable(persistenceId, start, max, end)
+        pollUntilAvailable(persistenceId, start, max, end, author)
       }
       case events => Future.successful(events)
     }
