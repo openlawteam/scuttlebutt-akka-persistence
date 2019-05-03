@@ -2,9 +2,10 @@ package org.openlaw.scuttlebutt.persistence
 
 import akka.actor._
 import akka.persistence.{PersistentActor, _}
+import org.openlaw.scuttlebutt.persistence.model.{AllowAccess, UpdateKey}
 
-class ScuttlebuttPersistentActorExample extends PersistentActor {
-  override def persistenceId = "sample-id-6"
+class EncryptionPersistentActorExample extends PersistentActor {
+  override def persistenceId = "sample-encrypted-2"
 
   var state = ExampleState()
 
@@ -16,12 +17,31 @@ class ScuttlebuttPersistentActorExample extends PersistentActor {
 
   val receiveRecover: Receive = {
     case evt: Evt                                 => updateState(evt)
+    case keyUpdate: UpdateKey => updateState(Evt("Key updated"))
     case SnapshotOffer(_, snapshot: ExampleState) => state = snapshot
     case x => println("Unrecognised: " + x)
   }
 
   val snapShotInterval = 1000
   val receiveCommand: Receive = {
+
+    case e: UpdateKey => {
+      persist(e) {
+        event => {
+          updateState(Evt("Key updated"))
+        }
+      }
+    }
+
+    case e: AllowAccess => {
+      persist(e) {
+        event => {
+          updateState(Evt("Added: " + e.userId))
+        }
+      }
+
+    }
+
     case Cmd(data) =>
       persist(Evt(s"${data}-${numEvents}")) { event =>
         updateState(event)
@@ -34,22 +54,28 @@ class ScuttlebuttPersistentActorExample extends PersistentActor {
 
 }
 
-object ScuttlebuttPersistentActorExampleTest {
+object EncryptionExample {
 
   def main(args: Array[String]): Unit = {
     val system = ActorSystem("HelloSystem")
     // default Actor constructor
-    val helloActor = system.actorOf(Props[ScuttlebuttPersistentActorExample], name = "persist-test-actor")
+    val helloActor = system.actorOf(Props[EncryptionPersistentActorExample], name = "persist-test-actor")
+
+    helloActor ! UpdateKey()
+
+    //helloActor ! Cmd("Test test")
+
+    helloActor ! AllowAccess("@XWgsea+zA4x+A0IeC/ajdqn8DoiyMrXGYdHmupL7tX0=.ed25519")
 
     helloActor ! "print"
-//
-//    var i = 0
-//    while (i < 20) {
-//      helloActor ! Cmd("new-test")
-//      helloActor ! "print"
-//      i = i + 1
-//    }
+
+    //
+    //    var i = 0
+    //    while (i < 20) {
+    //      helloActor ! Cmd("new-test")
+    //      helloActor ! "print"
+    //      i = i + 1
+    //    }
   }
 
 }
-
