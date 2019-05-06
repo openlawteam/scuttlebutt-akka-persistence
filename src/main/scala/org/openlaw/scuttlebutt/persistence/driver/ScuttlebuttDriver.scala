@@ -76,7 +76,7 @@ class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
   def currentPersistenceIds(): Future[Try[List[String]]] = {
     val function: RPCFunction = new RPCFunction(
       util.Arrays.asList("akkaPersistenceIndex", "persistenceIds"),
-      "currentPersistenceIdsAsync")
+      "myCurrentPersistenceIdsAsync")
 
     val request: RPCAsyncRequest = new RPCAsyncRequest(function, util.Arrays.asList())
 

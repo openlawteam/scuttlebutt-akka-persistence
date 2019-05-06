@@ -22,11 +22,6 @@ object ReadJournalExample {
     val source = readJournal.currentEventsByPersistenceId(
       "sample-id-6", 0, 101
     )
-
-    // Using an alternative author ID to our own
-    val source2 = readJournal.eventsByAuthorAndPeristenceId("@RJ09Kfs3neEZPrbpbWVDxkN92x9moe3aPusOMOc4S2I=.ed25519",
-      "sample-id-6", 0, 30)
-
     source.runWith(Sink.foreach(println))
 
     val allPersistenceIdsSource = readJournal.currentPersistenceIds()
