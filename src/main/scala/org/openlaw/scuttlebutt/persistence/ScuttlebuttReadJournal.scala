@@ -115,7 +115,6 @@ class ScuttlebuttReadJournal(
     }
   }
 
-
   private def toEnvelope(rpcMessage: RPCResponse): EventEnvelope = {
     val content: ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])
 
