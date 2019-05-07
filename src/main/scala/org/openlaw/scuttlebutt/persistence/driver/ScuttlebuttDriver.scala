@@ -12,9 +12,10 @@ import net.consensys.cava.scuttlebutt.rpc.mux.exceptions.ConnectionClosedExcepti
 import net.consensys.cava.scuttlebutt.rpc.mux.{Multiplexer, ScuttlebuttStreamHandler}
 import org.openlaw.scuttlebutt.persistence.converters.FutureConverters
 import org.openlaw.scuttlebutt.persistence.converters.FutureConverters.asyncResultToFuture
+import org.openlaw.scuttlebutt.persistence.model.StreamOptions
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success, Try}
 
 class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
@@ -25,7 +26,7 @@ class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
   }
 
   def getHighestSequenceNr(persistenceId: String): Future[Long] = {
-    val function: RPCFunction = new RPCFunction(util.Arrays.asList("akkaPersistenceIndex"), "highestSequenceNumber")
+    val function: RPCFunction = new RPCFunction(util.Arrays.asList("akkaPersistenceIndex", "events"), "highestSequenceNumber")
     val request: RPCAsyncRequest = new RPCAsyncRequest(function, util.Arrays.asList(null, persistenceId))
 
     val response: Future[RPCResponse] = multiplexer.makeAsyncRequest(request)
@@ -52,7 +53,7 @@ class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
                             handler: Function[Runnable, ScuttlebuttStreamHandler]) = {
 
     val function: RPCFunction = new RPCFunction(
-      util.Arrays.asList("akkaPersistenceIndex"),
+      util.Arrays.asList("akkaPersistenceIndex", "events"),
       "eventsByPersistenceId")
 
     val request = new RPCStreamRequest(function, util.Arrays.asList(
@@ -64,7 +65,6 @@ class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
     multiplexer.openStream(request, handler)
   }
 
-
   // TODO: better query representation than an ObjectNode
   def openQueryStream(query: ObjectNode, streamHandler: Function[Runnable, ScuttlebuttStreamHandler]) = {
     val function: RPCFunction = new RPCFunction(util.Arrays.asList("query"), "read")
@@ -75,21 +75,77 @@ class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
 
   def currentPersistenceIds(): Future[Try[List[String]]] = {
     val function: RPCFunction = new RPCFunction(
-      util.Arrays.asList("akkaPersistenceIndex"),
-      "currentPersistenceIdsAsync")
+      util.Arrays.asList("akkaPersistenceIndex", "persistenceIds"),
+      "myCurrentPersistenceIdsAsync")
 
     val request: RPCAsyncRequest = new RPCAsyncRequest(function, util.Arrays.asList())
 
     multiplexer.makeAsyncRequest(request).map(result => Success(result.asJSON(objectMapper, classOf[List[String]]) )).recover {
       case exception => Failure(exception)
     }
+  }
 
+  def getPersistenceIdsForAuthor(authorId: String, start: Long, end: Long, reverse: Boolean = false): Future[Try[List[String]]] = {
+    val function: RPCFunction = new RPCFunction(
+      util.Arrays.asList("akkaPersistenceIndex", "persistenceIds"),
+      "persistenceIdsForAuthor")
+
+    val options: StreamOptions = new StreamOptions(start, end, reverse)
+    val request: RPCStreamRequest = new RPCStreamRequest(function, util.Arrays.asList(authorId, options))
+
+    stringStreamToArrayHandler(request)
+  }
+
+  def getAuthorsForPersistenceId(persistenceId: String): Future[Try[List[String]]] = {
+    val function: RPCFunction = new RPCFunction(
+      util.Arrays.asList("akkaPersistenceIndex", "persistenceIds"),
+      "authorsForPersistenceId")
+
+    val request: RPCStreamRequest = new RPCStreamRequest(function, util.Arrays.asList(persistenceId))
+
+    stringStreamToArrayHandler(request)
+  }
+
+  def getAllAuthors(): Future[Try[List[String]]] = {
+    val function: RPCFunction = new RPCFunction(
+      util.Arrays.asList("akkaPersistenceIndex", "persistenceIds"),
+      "allAuthors")
+
+    val request: RPCStreamRequest = new RPCStreamRequest(function, util.Arrays.asList())
+
+    stringStreamToArrayHandler(request)
+  }
+
+  def stringStreamToArrayHandler(request: RPCStreamRequest) = {
+    var promise: Promise[List[String]] = Promise()
+
+    multiplexer.openStream(request, (stopper) => {
+      new ScuttlebuttStreamHandler {
+        var results: Seq[String] = List()
+
+        override def onMessage(message: RPCResponse): Unit = {
+          results = results :+ message.asString()
+        }
+
+        override def onStreamEnd(): Unit = {
+          promise.success(results.toList)
+        }
+
+        override def onStreamError(ex: Exception): Unit = {
+          promise.failure(ex)
+        }
+      }
+    })
+
+    promise.future.map(Success(_)).recover {
+      case exception => Failure(exception)
+    }
   }
 
 
   private def makeRPCMessage(persistentRep: PersistentRepr): RPCAsyncRequest = {
 
-    val func: RPCFunction = new RPCFunction(util.Arrays.asList("akkaPersistenceIndex"), "persistEvent")
+    val func: RPCFunction = new RPCFunction(util.Arrays.asList("akkaPersistenceIndex", "events"), "persistEvent")
     val repWithClassName: PersistentRepr = persistentRep.withManifest(persistentRep.payload.getClass.getName)
     val reqBody: ObjectNode = objectMapper.valueToTree(repWithClassName)
 
