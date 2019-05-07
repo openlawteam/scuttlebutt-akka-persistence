@@ -5,7 +5,7 @@ import akka.actor.ExtendedActorSystem
 import akka.persistence.{Persistence, PersistentRepr}
 import akka.persistence.query.{EventEnvelope, Offset, Sequence}
 import akka.persistence.query.scaladsl.ReadJournal
-import akka.stream.scaladsl.{Source}
+import akka.stream.scaladsl.Source
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.typesafe.config.Config
@@ -16,7 +16,7 @@ import org.openlaw.scuttlebutt.persistence.serialization.PersistedMessage
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.util.{Success, Failure}
+import scala.util.{Failure, Success, Try}
 
 
 class ScuttlebuttReadJournal(
@@ -51,6 +51,14 @@ class ScuttlebuttReadJournal(
                                    ): Source[EventEnvelope, NotUsed] = {
 
     eventsByPersistenceIdSource(persistenceId, fromSequenceNr, toSequenceNr, true, author)
+  }
+
+  def getAuthorsForPersistenceId(persistenceId: String): Future[Try[List[String]]] = {
+    scuttlebuttDriver.getAuthorsForPersistenceId(persistenceId)
+  }
+
+  def getPersistenceIdsForAuthor() : Source[String, NotUsed] = {
+
   }
 
   private def eventsByPersistenceIdSource(
