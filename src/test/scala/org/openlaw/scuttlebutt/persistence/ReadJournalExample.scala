@@ -28,6 +28,8 @@ object ReadJournalExample {
 
     allPersistenceIdsSource.runWith(Sink.foreach(println))
 
+    //readJournal.allAuthors()
+
   }
 
 

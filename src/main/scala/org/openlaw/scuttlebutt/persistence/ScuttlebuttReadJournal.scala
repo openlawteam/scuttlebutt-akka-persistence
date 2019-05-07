@@ -11,7 +11,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.typesafe.config.Config
 import net.consensys.cava.scuttlebutt.rpc.RPCResponse
 import org.openlaw.scuttlebutt.persistence.driver.ScuttlebuttDriver
-import org.openlaw.scuttlebutt.persistence.reader.ScuttlebuttStreamRangeFiller
+import org.openlaw.scuttlebutt.persistence.reader.{PageStream, ScuttlebuttStreamRangeFiller}
 import org.openlaw.scuttlebutt.persistence.serialization.PersistedMessage
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -57,53 +57,30 @@ class ScuttlebuttReadJournal(
     scuttlebuttDriver.getAuthorsForPersistenceId(persistenceId)
   }
 
-  def getPersistenceIdsForAuthor() : Source[String, NotUsed] = {
+  def getPersistenceIdsForAuthor(authorId: String, live: Boolean = false) : Source[String, NotUsed] = {
+    val pager = (start: Long, end: Long) => scuttlebuttDriver.getPersistenceIdsForAuthor(authorId, start, end, true)
 
-  }
+    val pageStream = new PageStream[String](pager, scuttlebuttDriver, config)
 
-  private def eventsByPersistenceIdSource(
-                                           persistenceId: String,
-                                           fromSequenceNr: Long,
-                                           toSequenceNr: Long,
-                                           live: Boolean,
-                                           author: String = null): Source[EventEnvelope, NotUsed] = {
-    val step = config.getInt("max-buffer-size")
-
-    val eventSource = Source.unfoldAsync[Long, Seq[EventEnvelope]](0) {
-
-      case start if start >= toSequenceNr => Future.successful(None)
-      case start => {
-        val end = Math.min(start + step, toSequenceNr)
-
-        if (live) {
-          pollUntilAvailable(persistenceId, start, step, end, author).map(
-            results => Some((start + results.length) -> results)
-          )
-        } else {
-          rangeFiller.getEventMessages(persistenceId, start, step, end, author)
-            .map(rpcMessages => rpcMessages.map(toEnvelope)).map {
-            case events if events.isEmpty => None
-            case events => Some((start + events.length) -> events)
-          }
-
-        }
-      }
+    if (live) {
+      pageStream.getLiveStream()
+    } else {
+      pageStream.getStream()
     }
+  }
 
-    eventSource.flatMapConcat(events => Source.fromIterator(() => events.iterator))
+  def allAuthors(): Future[Try[List[String]]] = {
+    scuttlebuttDriver.getAllAuthors()
   }
 
 
-  override def persistenceIds(): Source[String, NotUsed] = ???
+  override def persistenceIds(): Source[String, NotUsed] = {
+    getPersistenceIdsForAuthor(null, true)
+  }
 
   override def currentPersistenceIds(): Source[String, NotUsed] = {
 
-    val currentPersistenceIds = scuttlebuttDriver.currentPersistenceIds()
-
-    Source.fromFuture(currentPersistenceIds).flatMapConcat {
-      case Success(values) => Source.fromIterator(() => values.iterator)
-      case Failure(exception) => Source.failed(exception)
-    }
+    getPersistenceIdsForAuthor(null, false)
   }
 
   override def eventsByTag(
@@ -140,6 +117,38 @@ class ScuttlebuttReadJournal(
       persistentRepr.sequenceNr,
       deserializedPayload
     )
+  }
+
+  private def eventsByPersistenceIdSource(
+                                           persistenceId: String,
+                                           fromSequenceNr: Long,
+                                           toSequenceNr: Long,
+                                           live: Boolean,
+                                           author: String = null): Source[EventEnvelope, NotUsed] = {
+    val step = config.getInt("max-buffer-size")
+
+    val eventSource = Source.unfoldAsync[Long, Seq[EventEnvelope]](0) {
+
+      case start if start >= toSequenceNr => Future.successful(None)
+      case start => {
+        val end = Math.min(start + step, toSequenceNr)
+
+        if (live) {
+          pollUntilAvailable(persistenceId, start, step, end, author).map(
+            results => Some((start + results.length) -> results)
+          )
+        } else {
+          rangeFiller.getEventMessages(persistenceId, start, step, end, author)
+            .map(rpcMessages => rpcMessages.map(toEnvelope)).map {
+            case events if events.isEmpty => None
+            case events => Some((start + events.length) -> events)
+          }
+
+        }
+      }
+    }
+
+    eventSource.flatMapConcat(events => Source.fromIterator(() => events.iterator))
   }
 
 }
