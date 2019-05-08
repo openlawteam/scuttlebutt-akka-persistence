@@ -7,12 +7,12 @@ import java.util.function.Consumer
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.typesafe.config.Config
 import io.vertx.core.Vertx
-import net.consensys.cava.bytes.{Bytes, Bytes32}
-import net.consensys.cava.concurrent.AsyncResult
-import net.consensys.cava.crypto.sodium.Signature
-import net.consensys.cava.io.Base64
-import net.consensys.cava.scuttlebutt.handshake.vertx.SecureScuttlebuttVertxClient
-import net.consensys.cava.scuttlebutt.rpc.mux.RPCHandler
+import org.apache.tuweni.bytes.{Bytes, Bytes32}
+import org.apache.tuweni.concurrent.AsyncResult
+import org.apache.tuweni.crypto.sodium.Signature
+import org.apache.tuweni.io.Base64
+import org.apache.tuweni.scuttlebutt.handshake.vertx.SecureScuttlebuttVertxClient
+import org.apache.tuweni.scuttlebutt.rpc.mux.RPCHandler
 import org.logl.Level
 import org.logl.logl.SimpleLogger
 

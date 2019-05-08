@@ -6,10 +6,10 @@ import java.util.function.Function
 import akka.persistence.PersistentRepr
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.fasterxml.jackson.databind.node.{JsonNodeFactory, ObjectNode}
-import net.consensys.cava.concurrent.AsyncResult
-import net.consensys.cava.scuttlebutt.rpc._
-import net.consensys.cava.scuttlebutt.rpc.mux.exceptions.ConnectionClosedException
-import net.consensys.cava.scuttlebutt.rpc.mux.{Multiplexer, ScuttlebuttStreamHandler}
+import org.apache.tuweni.concurrent.AsyncResult
+import org.apache.tuweni.scuttlebutt.rpc._
+import org.apache.tuweni.scuttlebutt.rpc.mux.exceptions.ConnectionClosedException
+import org.apache.tuweni.scuttlebutt.rpc.mux.{Multiplexer, ScuttlebuttStreamHandler}
 import org.openlaw.scuttlebutt.persistence.converters.FutureConverters
 import org.openlaw.scuttlebutt.persistence.converters.FutureConverters.asyncResultToFuture
 import org.openlaw.scuttlebutt.persistence.model.StreamOptions

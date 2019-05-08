@@ -1,8 +1,8 @@
 package org.openlaw.scuttlebutt.persistence.reader
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import net.consensys.cava.scuttlebutt.rpc.RPCResponse
-import net.consensys.cava.scuttlebutt.rpc.mux.ScuttlebuttStreamHandler
+import org.apache.tuweni.scuttlebutt.rpc.RPCResponse
+import org.apache.tuweni.scuttlebutt.rpc.mux.ScuttlebuttStreamHandler
 import org.openlaw.scuttlebutt.persistence.driver.ScuttlebuttDriver
 
 import scala.concurrent.{Future, Promise}

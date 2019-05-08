@@ -3,8 +3,8 @@ package org.openlaw.scuttlebutt.persistence
 import akka.persistence.PersistentRepr
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.fasterxml.jackson.databind.node.ObjectNode
-import net.consensys.cava.scuttlebutt.rpc.{RPCMessage, RPCResponse}
-import net.consensys.cava.scuttlebutt.rpc.mux.ScuttlebuttStreamHandler
+import org.apache.tuweni.scuttlebutt.rpc.{RPCMessage, RPCResponse}
+import org.apache.tuweni.scuttlebutt.rpc.mux.ScuttlebuttStreamHandler
 import org.openlaw.scuttlebutt.persistence.serialization.PersistedMessage
 
 import scala.concurrent.Promise

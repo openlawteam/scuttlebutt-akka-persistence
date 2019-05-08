@@ -7,9 +7,9 @@ import java.util.Scanner
 
 import com.fasterxml.jackson.core.`type`.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
-import net.consensys.cava.bytes.Bytes
-import net.consensys.cava.crypto.sodium.Signature
-import net.consensys.cava.io.Base64
+import org.apache.tuweni.bytes.Bytes
+import org.apache.tuweni.crypto.sodium.Signature
+import org.apache.tuweni.io.Base64
 
 object KeyUtils {
 

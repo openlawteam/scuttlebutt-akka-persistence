@@ -1,6 +1,6 @@
 package org.openlaw.scuttlebutt.persistence.converters
 
-import net.consensys.cava.concurrent.AsyncResult
+import org.apache.tuweni.concurrent.AsyncResult
 
 import scala.concurrent.{Future, Promise}
 
