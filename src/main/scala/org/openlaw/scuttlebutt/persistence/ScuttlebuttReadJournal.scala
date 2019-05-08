@@ -119,7 +119,7 @@ class ScuttlebuttReadJournal(
     * @return
     */
   def getPersistenceIdsForAuthor(authorId: String, live: Boolean = false): Source[String, NotUsed] = {
-    val pager = (start: Long, end: Long) => scuttlebuttDriver.getPersistenceIdsForAuthor(authorId, start, end, true)
+    val pager = (start: Long, end: Long) => scuttlebuttDriver.getPersistenceIdsForAuthor(authorId, start, end, false)
 
     val pageStream = new PageStream[String](pager, scuttlebuttDriver, config)
 
