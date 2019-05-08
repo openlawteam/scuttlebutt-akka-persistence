@@ -35,29 +35,90 @@ class ScuttlebuttReadJournal(
 
   val rangeFiller = new ScuttlebuttStreamRangeFiller(scuttlebuttDriver, objectMapper)
 
+  /**
+    * A stream of the current events for the local instance by persistenceId (stream ends when there
+    * are no more elements.)
+    *
+    * @param persistenceId  the persistence ID to get the events for
+    * @param fromSequenceNr the sequence number to start getting events from
+    * @param toSequenceNr   the maximum number to get events for (stream will end early if the current largest
+    *                       sequence number is larger.)
+    * @return A stream of the current persistence IDs for the local instance
+    */
   override def currentEventsByPersistenceId(persistenceId: String, fromSequenceNr: Long, toSequenceNr: Long): Source[EventEnvelope, NotUsed] = {
     eventsByPersistenceIdSource(persistenceId, fromSequenceNr, toSequenceNr, false)
   }
 
+  /**
+    * A stream of the current events for the local instance by persistenceId. If there is not yet an event with the
+    * 'toSequenceNr' the stream will remain open until there is. This means that a 'live' stream can be opened by
+    * using Long.MaxValue for the 'toSequenceNr' parameter and events will be emitted as they are available.
+    *
+    * @param persistenceId  the persistence ID to get events for
+    * @param fromSequenceNr the sequence number to start getting events from
+    * @param toSequenceNr   the maximum number to get events for (stream will not end until this has been reached.)
+    * @return
+    */
   override def eventsByPersistenceId(
                                       persistenceId: String, fromSequenceNr: Long,
                                       toSequenceNr: Long): Source[EventEnvelope, NotUsed] = {
     eventsByPersistenceIdSource(persistenceId, fromSequenceNr, toSequenceNr, true)
   }
 
-  def eventsByAuthorAndPeristenceId(
-                                     author: String, persistenceId: String, fromSequenceNr: Long,
-                                     toSequenceNr: Long
-                                   ): Source[EventEnvelope, NotUsed] = {
+  /**
+    * A stream of the current events for the local instance by persistenceId and authorId (stream ends when there
+    * are no more elements.)
+    *
+    * @param author         the author ID for the instance.
+    * @param persistenceId  the persistence ID to get the events for
+    * @param fromSequenceNr the sequence number to start getting events from
+    * @param toSequenceNr   the maximum number to get events for (stream will end early if the current largest
+    *                       sequence number is larger.)
+    * @return A stream of the current persistence IDs for the local instance
+    */
+  def currentEventsByAuthorAndPeristenceId(
+                                            author: String, persistenceId: String, fromSequenceNr: Long,
+                                            toSequenceNr: Long
+                                          ): Source[EventEnvelope, NotUsed] = {
+
+    eventsByPersistenceIdSource(persistenceId, fromSequenceNr, toSequenceNr, false, author)
+  }
+
+  /**
+    * A stream of the current events for the local instance by persistenceId and instance author ID. If there is not yet an event with the
+    * 'toSequenceNr' the stream will remain open until there is. This means that a 'live' stream can be opened by
+    * using Long.MaxValue for the 'toSequenceNr' parameter and events will be emitted as they are available.
+    *
+    * @param persistenceId  the persistence ID to get events for
+    * @param fromSequenceNr the sequence number to start getting events from
+    * @param toSequenceNr   the maximum number to get events for (stream will not end until this has been reached.)
+    * @return
+    */
+  def liveEventsByAuthorAndPeristenceId(
+                                         author: String, persistenceId: String, fromSequenceNr: Long,
+                                         toSequenceNr: Long
+                                       ): Source[EventEnvelope, NotUsed] = {
 
     eventsByPersistenceIdSource(persistenceId, fromSequenceNr, toSequenceNr, true, author)
   }
 
+
+  /**
+    * Get all the instances who have their own version of the given persistenceId.
+    * @param persistenceId the persistence ID to get the authors for
+    * @return
+    */
   def getAuthorsForPersistenceId(persistenceId: String): Future[Try[List[String]]] = {
     scuttlebuttDriver.getAuthorsForPersistenceId(persistenceId)
   }
 
-  def getPersistenceIdsForAuthor(authorId: String, live: Boolean = false) : Source[String, NotUsed] = {
+  /**
+    *
+    * @param authorId the ID of the author (instance) for the events
+    * @param live whether this stream should remain open and emit any new persistence IDs for the given author (defaults to false)
+    * @return
+    */
+  def getPersistenceIdsForAuthor(authorId: String, live: Boolean = false): Source[String, NotUsed] = {
     val pager = (start: Long, end: Long) => scuttlebuttDriver.getPersistenceIdsForAuthor(authorId, start, end, true)
 
     val pageStream = new PageStream[String](pager, scuttlebuttDriver, config)
@@ -69,15 +130,31 @@ class ScuttlebuttReadJournal(
     }
   }
 
+  /**
+    * All the authors currently in the system.
+    * @return
+    */
   def allAuthors(): Future[Try[List[String]]] = {
     scuttlebuttDriver.getAllAuthors()
   }
 
 
+  /**
+    * All the persistence IDs the current author (instance) has created. Stream remains open and emits new values
+    * as new entities are created.
+    *
+    * @return
+    */
   override def persistenceIds(): Source[String, NotUsed] = {
     getPersistenceIdsForAuthor(null, true)
   }
 
+  /**
+    * All the persistence IDs the current author (instance) has created. Stream remains open and emits new values
+    * as new entities are created. The stream does not remain open.
+    *
+    * @return
+    */
   override def currentPersistenceIds(): Source[String, NotUsed] = {
 
     getPersistenceIdsForAuthor(null, false)
