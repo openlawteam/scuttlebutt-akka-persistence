@@ -61,7 +61,7 @@ class MultiplexerLoader(objectMapper: ObjectMapper, scuttlebuttConf: Config) {
 
   private def getKeys(): Option[Signature.KeyPair] = {
     if (scuttlebuttConf.hasPath("secret.path")) {
-      KeyUtils.getKeysAtPath(scuttlebuttConf.getString("scuttlebutt-journal.secret.path"))
+      KeyUtils.getKeysAtPath(scuttlebuttConf.getString("secret.path"))
     }
     else {
       KeyUtils.getLocalKeys()

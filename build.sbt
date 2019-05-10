@@ -1,6 +1,6 @@
 name := "scuttlebutt-akka-persistence"
 
-version := "0.6"
+version := "0.8"
 
 scalaVersion := "2.12.8"
 
@@ -23,6 +23,7 @@ libraryDependencies += "org.logl" % "logl-logl" % "0.4.0-24B971-snapshot"
 libraryDependencies += "org.logl" % "logl-api" % "0.4.0-24B971-snapshot"
 
 libraryDependencies += "com.github.jnr" % "jnr-ffi" % "2.1.9"
+libraryDependencies += "com.github.jnr" % "jffi" % "1.2.18"
 
 libraryDependencies += "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.9.8"
 
