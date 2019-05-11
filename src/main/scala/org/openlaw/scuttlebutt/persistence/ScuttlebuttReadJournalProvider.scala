@@ -1,6 +1,7 @@
 package org.openlaw.scuttlebutt.persistence
 
 import akka.actor.ExtendedActorSystem
+import akka.persistence.Persistence
 import akka.persistence.query.scaladsl.ReadJournal
 import akka.persistence.query.{ReadJournalProvider, javadsl}
 import com.typesafe.config.Config

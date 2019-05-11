@@ -4,6 +4,7 @@ import java.util
 import java.util.function.Function
 
 import akka.persistence.PersistentRepr
+import akka.persistence.query.{EventEnvelope, Sequence}
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.fasterxml.jackson.databind.node.{JsonNodeFactory, ObjectNode}
 import org.apache.tuweni.concurrent.AsyncResult
@@ -116,7 +117,7 @@ class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
     stringStreamToArrayHandler(request)
   }
 
-  def stringStreamToArrayHandler(request: RPCStreamRequest) = {
+  private def stringStreamToArrayHandler(request: RPCStreamRequest) = {
     var promise: Promise[List[String]] = Promise()
 
     multiplexer.openStream(request, (stopper) => {
@@ -125,6 +126,43 @@ class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
 
         override def onMessage(message: RPCResponse): Unit = {
           results = results :+ message.asString()
+        }
+
+        override def onStreamEnd(): Unit = {
+          promise.success(results.toList)
+        }
+
+        override def onStreamError(ex: Exception): Unit = {
+          promise.failure(ex)
+        }
+      }
+    })
+
+    promise.future.map(Success(_)).recover {
+      case exception => Failure(exception)
+    }
+  }
+
+  def getEventsForAuthor(authorId: String, start: Long, end: Long): Future[Try[List[RPCResponse]]] = {
+    val function: RPCFunction = new RPCFunction(
+      util.Arrays.asList("akkaPersistenceIndex", "events"),
+      "allEventsForAuthor")
+
+    val options: StreamOptions = new StreamOptions(start, end, false)
+    val request: RPCStreamRequest = new RPCStreamRequest(function, util.Arrays.asList(authorId, options))
+
+    rpcResponseArrayFiller(request)
+  }
+
+  private def rpcResponseArrayFiller(request: RPCStreamRequest) = {
+    var promise: Promise[List[RPCResponse]] = Promise()
+
+    multiplexer.openStream(request, (stopper) => {
+      new ScuttlebuttStreamHandler {
+        var results: Seq[RPCResponse] = List()
+
+        override def onMessage(message: RPCResponse): Unit = {
+          results = results :+ message
         }
 
         override def onStreamEnd(): Unit = {

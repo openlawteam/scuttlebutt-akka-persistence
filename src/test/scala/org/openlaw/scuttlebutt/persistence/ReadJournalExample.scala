@@ -22,11 +22,13 @@ object ReadJournalExample {
     val source = readJournal.currentEventsByPersistenceId(
       "sample-id-6", 0, 101
     )
-    source.runWith(Sink.foreach(println))
+    //source.runWith(Sink.foreach(println))
 
     val allPersistenceIdsSource = readJournal.currentPersistenceIds()
 
-    allPersistenceIdsSource.runWith(Sink.foreach(println))
+  //  allPersistenceIdsSource.runWith(Sink.foreach(println))
+
+    readJournal.getAllEventsForAuthor(null, live=true).runWith(Sink.foreach(println))
 
     //readJournal.allAuthors()
 

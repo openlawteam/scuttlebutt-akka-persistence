@@ -1,14 +1,14 @@
 package org.openlaw.scuttlebutt.persistence
 
+import akka.actor.ExtendedActorSystem
 import akka.persistence.journal.AsyncWriteJournal
-import akka.persistence.{AtomicWrite, PersistentRepr}
+import akka.persistence.{AtomicWrite, Persistence, PersistentRepr}
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.Config
 import org.apache.tuweni.scuttlebutt.rpc.mux.{RPCHandler, ScuttlebuttStreamHandler}
 import org.apache.tuweni.scuttlebutt.rpc._
 import org.openlaw.scuttlebutt.persistence.driver.{MultiplexerLoader, ScuttlebuttDriver}
-
 import org.openlaw.scuttlebutt.persistence.serialization.{PersistedMessage, ScuttlebuttPersistenceSerializationConfig}
 
 import scala.collection.immutable

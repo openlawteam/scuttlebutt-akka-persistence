@@ -130,6 +130,20 @@ class ScuttlebuttReadJournal(
     }
   }
 
+  def getAllEventsForAuthor(authorId: String, live: Boolean = false): Source[EventEnvelope, NotUsed] = {
+    val pager = (start: Long, end: Long) => scuttlebuttDriver.getEventsForAuthor(authorId, start, end).map(
+      _.map(_.map(toEnvelope(_)))
+    )
+
+    val pageStream = new PageStream[EventEnvelope](pager, scuttlebuttDriver, config)
+
+    if (live) {
+      pageStream.getLiveStream()
+    } else {
+      pageStream.getStream()
+    }
+  }
+
   /**
     * All the authors currently in the system.
     * @return
