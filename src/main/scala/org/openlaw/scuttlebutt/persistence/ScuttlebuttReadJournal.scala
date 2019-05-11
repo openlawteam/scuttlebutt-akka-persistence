@@ -121,7 +121,7 @@ class ScuttlebuttReadJournal(
   def getPersistenceIdsForAuthor(authorId: String, live: Boolean = false): Source[String, NotUsed] = {
     val pager = (start: Long, end: Long) => scuttlebuttDriver.getPersistenceIdsForAuthor(authorId, start, end, false)
 
-    val pageStream = new PageStream[String](pager, scuttlebuttDriver, config)
+    val pageStream = new PageStream[String](pager, scuttlebuttDriver, config, PageStream.defaultNextPage)
 
     if (live) {
       pageStream.getLiveStream()
@@ -131,16 +131,26 @@ class ScuttlebuttReadJournal(
   }
 
   def getAllEventsForAuthor(authorId: String, live: Boolean = false): Source[EventEnvelope, NotUsed] = {
+
+    val getNextPageStart = (start: Long, result: Seq[(EventEnvelope, Long)]) => {
+      if (result.length == 0) {
+        start
+      } else {
+        result.last._2 + 1
+      }
+
+    }
+
     val pager = (start: Long, end: Long) => scuttlebuttDriver.getEventsForAuthor(authorId, start, end).map(
-      _.map(_.map(toEnvelope(_)))
+      _.map(_.map(toEnvelopeWithStartSequence(_)))
     )
 
-    val pageStream = new PageStream[EventEnvelope](pager, scuttlebuttDriver, config)
+    val pageStream = new PageStream[(EventEnvelope, Long)](pager, scuttlebuttDriver, config, getNextPageStart)
 
     if (live) {
-      pageStream.getLiveStream()
+      pageStream.getLiveStream().map(result => result._1)
     } else {
-      pageStream.getStream()
+      pageStream.getStream().map(result => result._1)
     }
   }
 
@@ -191,9 +201,22 @@ class ScuttlebuttReadJournal(
     }
   }
 
+  private def toEnvelopeWithStartSequence(rpcMessage: RPCResponse): (EventEnvelope, Long) = {
+    val content: ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])
+
+    val sequence = content.get("scuttlebuttSequence").asLong()
+    val eventEnvelope = toEnvelope(content)
+
+    (eventEnvelope, sequence)
+  }
+
   private def toEnvelope(rpcMessage: RPCResponse): EventEnvelope = {
     val content: ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])
 
+    toEnvelope(content)
+  }
+
+  private def toEnvelope(content: ObjectNode): EventEnvelope = {
     val payload: JsonNode = content.findPath("payload")
 
     val persistentRepr: PersistentRepr = objectMapper.treeToValue(content, classOf[PersistedMessage])
@@ -208,6 +231,7 @@ class ScuttlebuttReadJournal(
       persistentRepr.sequenceNr,
       deserializedPayload
     )
+
   }
 
   private def eventsByPersistenceIdSource(

@@ -11,9 +11,18 @@ import com.typesafe.config.Config
 import scala.concurrent.ExecutionContext.Implicits.global
 
 
+object PageStream {
+
+  def defaultNextPage[T](start: Long, result: Seq[T]): Long = {
+    start + result.length
+  }
+
+}
+
 case class PageStream[T](pager: (Long, Long) => Future[Try[Seq[T]]],
                          scuttlebuttDriver: ScuttlebuttDriver,
-                         config: Config) {
+                         config: Config,
+                         nextPageStart: ((Long, Seq[T]) => Long)) {
 
 
   def getStream(): Source[T, NotUsed] = {
@@ -29,7 +38,7 @@ case class PageStream[T](pager: (Long, Long) => Future[Try[Seq[T]]],
             None
           }
           case Success(result) => {
-            Some((start + result.length) -> result)
+            Some(nextPageStart(start, result) -> result)
           }
           case Failure(exception) => throw exception
         }
@@ -52,10 +61,10 @@ case class PageStream[T](pager: (Long, Long) => Future[Try[Seq[T]]],
         pollUntilAvailable(pager, start, end).map {
 
           case Success(result) if result.isEmpty => {
-            Some((start + result.length) -> result)
+            Some(nextPageStart(start, result) -> result)
           }
           case Success(result) => {
-            Some((start + result.length) -> result)
+            Some(nextPageStart(start, result) -> result)
           }
           case Failure(exception) => throw exception
         }
