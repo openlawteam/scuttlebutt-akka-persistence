@@ -4,7 +4,7 @@ import akka.actor._
 import akka.persistence.{PersistentActor, _}
 
 class ScuttlebuttPersistentActorExample extends PersistentActor {
-  override def persistenceId = "sample-id-6"
+  override def persistenceId = "sample-id-7"
 
   var state = ExampleState()
 
@@ -44,7 +44,7 @@ object ScuttlebuttPersistentActorExampleTest {
     helloActor ! "print"
 
     var i = 0
-    while (i < 20) {
+    while (i < 121) {
       helloActor ! Cmd("new-test")
       helloActor ! "print"
       i = i + 1

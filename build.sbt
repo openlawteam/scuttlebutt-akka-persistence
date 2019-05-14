@@ -1,6 +1,6 @@
 name := "scuttlebutt-akka-persistence"
 
-version := "0.8"
+version := "1.0"
 
 scalaVersion := "2.12.8"
 

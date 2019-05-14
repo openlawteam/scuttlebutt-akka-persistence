@@ -110,7 +110,7 @@ class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
   def getAllAuthors(): Future[Try[List[String]]] = {
     val function: RPCFunction = new RPCFunction(
       util.Arrays.asList("akkaPersistenceIndex", "persistenceIds"),
-      "allAuthors")
+      "allOtherAuthors")
 
     val request: RPCStreamRequest = new RPCStreamRequest(function, util.Arrays.asList())
 

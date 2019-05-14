@@ -7,8 +7,11 @@ import akka.persistence.query.{EventEnvelope, PersistenceQuery}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
 
+import scala.concurrent.ExecutionContext
 
 object ReadJournalExample {
+
+  implicit val ec: ExecutionContext = ExecutionContext.global
 
   def main(args: Array[String]): Unit = {
 
@@ -26,11 +29,11 @@ object ReadJournalExample {
 
     val allPersistenceIdsSource = readJournal.currentPersistenceIds()
 
-  //  allPersistenceIdsSource.runWith(Sink.foreach(println))
+    allPersistenceIdsSource.runWith(Sink.foreach(println))
 
     readJournal.getAllEventsForAuthor(null, live=true).runWith(Sink.foreach(println))
 
-    //readJournal.allAuthors()
+    readJournal.allOtherAuthors().foreach(println)
 
   }
 

@@ -9,6 +9,8 @@ import scala.util.{Failure, Success, Try}
 import com.typesafe.config.Config
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.blocking
+
 
 
 object PageStream {
@@ -79,8 +81,13 @@ case class PageStream[T](pager: (Long, Long) => Future[Try[Seq[T]]],
     pager(start, end).flatMap {
       case Success(events) if events.isEmpty => {
 
-        Thread.sleep(config.getDuration("refresh-interval").toMillis)
-        pager(start, end)
+        val sleep = Future {
+          blocking {
+            Thread.sleep(config.getDuration("refresh-interval").toMillis)
+          }
+        }
+
+        sleep.flatMap(_ => pager(start, end))
       }
       case result: Success[Seq[T]] => Future.successful(result)
     }

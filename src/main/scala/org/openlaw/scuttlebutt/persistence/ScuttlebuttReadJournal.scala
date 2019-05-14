@@ -16,7 +16,9 @@ import org.openlaw.scuttlebutt.persistence.serialization.PersistedMessage
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.util.{Failure, Success, Try}
+import scala.util.{Try}
+
+import scala.concurrent.blocking
 
 
 class ScuttlebuttReadJournal(
@@ -155,10 +157,10 @@ class ScuttlebuttReadJournal(
   }
 
   /**
-    * All the authors currently in the system.
+    * All the other authors currently in the system.
     * @return
     */
-  def allAuthors(): Future[Try[List[String]]] = {
+  def allOtherAuthors(): Future[Try[List[String]]] = {
     scuttlebuttDriver.getAllAuthors()
   }
 
@@ -194,8 +196,13 @@ class ScuttlebuttReadJournal(
     rangeFiller.getEventMessages(persistenceId, start, max, end, author).map(events => events.map(toEnvelope)).flatMap {
       case events if events.isEmpty => {
 
-        Thread.sleep(config.getDuration("refresh-interval").toMillis)
-        pollUntilAvailable(persistenceId, start, max, end, author)
+        val sleep: Future[Unit] = Future[Unit] {
+          blocking {
+            Thread.sleep(config.getDuration("refresh-interval").toMillis)
+          }
+        }
+
+        sleep.flatMap(_ => pollUntilAvailable(persistenceId, start, max, end, author))
       }
       case events => Future.successful(events)
     }
