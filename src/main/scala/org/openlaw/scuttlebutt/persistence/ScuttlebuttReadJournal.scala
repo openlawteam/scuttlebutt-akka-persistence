@@ -133,7 +133,10 @@ class ScuttlebuttReadJournal(
   }
 
   def getAllEventsForAuthor(authorId: String, live: Boolean = false): Source[EventEnvelope, NotUsed] = {
+    getAllEventsForAuthorAfterSequenceNr(authorId, 0, live).map(_._1)
+  }
 
+  def getAllEventsForAuthorAfterSequenceNr(authorId: String, startingAt: Long, live: Boolean = false): Source[(EventEnvelope, Long), NotUsed] = {
     val getNextPageStart = (start: Long, result: Seq[(EventEnvelope, Long)]) => {
       if (result.length == 0) {
         start
@@ -147,13 +150,14 @@ class ScuttlebuttReadJournal(
       _.map(_.map(toEnvelopeWithStartSequence(_)))
     )
 
-    val pageStream = new PageStream[(EventEnvelope, Long)](pager, scuttlebuttDriver, config, getNextPageStart)
+    val pageStream = new PageStream[(EventEnvelope, Long)](pager, scuttlebuttDriver, config, getNextPageStart, startingAt)
 
     if (live) {
-      pageStream.getLiveStream().map(result => result._1)
+      pageStream.getLiveStream()
     } else {
-      pageStream.getStream().map(result => result._1)
+      pageStream.getStream()
     }
+
   }
 
   /**

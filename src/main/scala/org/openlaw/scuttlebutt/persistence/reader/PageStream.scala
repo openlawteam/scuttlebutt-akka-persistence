@@ -24,14 +24,15 @@ object PageStream {
 case class PageStream[T](pager: (Long, Long) => Future[Try[Seq[T]]],
                          scuttlebuttDriver: ScuttlebuttDriver,
                          config: Config,
-                         nextPageStart: ((Long, Seq[T]) => Long)) {
+                         nextPageStart: ((Long, Seq[T]) => Long),
+                         startAtItem: Long = 0) {
 
 
   def getStream(): Source[T, NotUsed] = {
 
     val step = config.getInt("max-buffer-size")
 
-    val eventSource = Source.unfoldAsync[Long, Seq[T]](0) {
+    val eventSource = Source.unfoldAsync[Long, Seq[T]](startAtItem) {
       case start => {
         val end = start + step
 
@@ -56,7 +57,7 @@ case class PageStream[T](pager: (Long, Long) => Future[Try[Seq[T]]],
 
     val step = config.getInt("max-buffer-size")
 
-    val eventSource = Source.unfoldAsync[Long, Seq[T]](0) {
+    val eventSource = Source.unfoldAsync[Long, Seq[T]](startAtItem) {
       case start => {
         val end = start + step
 
