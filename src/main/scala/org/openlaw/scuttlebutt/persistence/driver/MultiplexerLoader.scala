@@ -46,8 +46,11 @@ class MultiplexerLoader(objectMapper: ObjectMapper, scuttlebuttConf: Config) {
     val host = scuttlebuttConf.getString("host")
     val port = scuttlebuttConf.getInt("port")
 
+    val debugEnabled = scuttlebuttConf.getBoolean("debug")
+    val debugLevel = if (debugEnabled) Level.DEBUG else Level.INFO
+
     val vertx = Vertx.vertx()
-    val loggerProvider = SimpleLogger.withLogLevel(Level.DEBUG).toPrintWriter(new PrintWriter(new BufferedWriter(new OutputStreamWriter(System.out, UTF_8))))
+    val loggerProvider = SimpleLogger.withLogLevel(debugLevel).toPrintWriter(new PrintWriter(new BufferedWriter(new OutputStreamWriter(System.out, UTF_8))))
     val secureScuttlebuttVertxClient = new SecureScuttlebuttVertxClient(loggerProvider, vertx, localKeys, networkKeyBytes32)
 
     val onConnect: AsyncResult[RPCHandler] = secureScuttlebuttVertxClient.connectTo(port, host, localKeys.publicKey, (sender: Consumer[Bytes], terminationFn: Runnable) => {
