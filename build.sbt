@@ -1,7 +1,5 @@
 name := "scuttlebutt-akka-persistence"
 
-version := "1.0"
-
 scalaVersion := "2.12.8"
 
 resolvers += "jcenter" at "http://jcenter.bintray.com/"
@@ -26,10 +24,10 @@ libraryDependencies += "com.github.jnr" % "jffi" % "1.2.18"
 
 libraryDependencies += "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.9.8"
 
-libraryDependencies += "org.openlaw" % "tuweni-scuttlebutt" % "9.9.1-SNAPSHOT"
-libraryDependencies += "org.openlaw" % "tuweni-scuttlebutt-rpc" % "9.9.1-SNAPSHOT"
-libraryDependencies += "org.openlaw" % "tuweni-scuttlebutt-handshake" % "9.9.1-SNAPSHOT"
-libraryDependencies += "org.openlaw" % "tuweni-crypto" % "9.9.1-SNAPSHOT"
+libraryDependencies += "org.openlaw" % "tuweni-scuttlebutt" % "0.8.0"
+libraryDependencies += "org.openlaw" % "tuweni-scuttlebutt-rpc" % "0.8.0"
+libraryDependencies += "org.openlaw" % "tuweni-scuttlebutt-handshake" % "0.8.0"
+libraryDependencies += "org.openlaw" % "tuweni-crypto" % "0.8.0"
 
 updateOptions := updateOptions.value.withLatestSnapshots(false)
 
