@@ -1,5 +1,8 @@
 package org.openlaw.scuttlebutt.persistence.model
 
+import akka.actor.ActorRef
+import akka.persistence.PersistentRepr
+
 /**
   * These messages can be persisted as akka persistence framework persistence events
   * to encrypt content for a given entity and restrict access to only specified users.
