@@ -63,19 +63,18 @@ object EncryptionExample {
 
     helloActor ! UpdateKey()
 
-    //helloActor ! Cmd("Test test")
+    helloActor ! Cmd("Test test")
 
     helloActor ! AllowAccess("@XWgsea+zA4x+A0IeC/ajdqn8DoiyMrXGYdHmupL7tX0=.ed25519")
 
     helloActor ! "print"
 
-    //
-    //    var i = 0
-    //    while (i < 20) {
-    //      helloActor ! Cmd("new-test")
-    //      helloActor ! "print"
-    //      i = i + 1
-    //    }
+    var i = 0
+    while (i < 20) {
+      helloActor ! Cmd("new-test")
+      helloActor ! "print"
+      i = i + 1
+    }
   }
 
 }

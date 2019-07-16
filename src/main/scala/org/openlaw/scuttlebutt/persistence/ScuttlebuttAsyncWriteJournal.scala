@@ -3,13 +3,14 @@ package org.openlaw.scuttlebutt.persistence
 import akka.actor.ExtendedActorSystem
 import akka.persistence.journal.AsyncWriteJournal
 import akka.persistence.{AtomicWrite, Persistence, PersistentRepr}
+import akka.serialization.{Serialization, SerializationExtension}
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.Config
 import org.apache.tuweni.scuttlebutt.rpc.mux.{RPCHandler, ScuttlebuttStreamHandler}
 import org.apache.tuweni.scuttlebutt.rpc._
 import org.openlaw.scuttlebutt.persistence.driver.{MultiplexerLoader, ScuttlebuttDriver}
-import org.openlaw.scuttlebutt.persistence.serialization.{PersistedMessage, ScuttlebuttPersistenceSerializationConfig}
+import org.openlaw.scuttlebutt.persistence.serialization.{PersistedMessage, ScuttlebuttPersistenceSerializer}
 
 import scala.collection.immutable
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -18,11 +19,15 @@ import scala.util.{Failure, Try}
 
 class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
 
-  val objectMapper: ObjectMapper = new ScuttlebuttPersistenceSerializationConfig().getObjectMapper()
+  val serializationConfig = new ScuttlebuttPersistenceSerializer(context.system)
+
+  val objectMapper: ObjectMapper = serializationConfig.getObjectMapper()
+  val scuttlebuttPersistenceSerializer = new ScuttlebuttPersistenceSerializer(context.system)
+
   val loader: MultiplexerLoader = new MultiplexerLoader(objectMapper, config)
 
   val rpcHandler: RPCHandler = loader.loadMultiplexer
-  val scuttlebuttDriver: ScuttlebuttDriver = new ScuttlebuttDriver(rpcHandler, objectMapper)
+  val scuttlebuttDriver: ScuttlebuttDriver = new ScuttlebuttDriver(rpcHandler, objectMapper, scuttlebuttPersistenceSerializer)
 
   override def asyncWriteMessages(messages: immutable.Seq[AtomicWrite]): Future[immutable.Seq[Try[Unit]]] = {
 
@@ -63,7 +68,7 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
     val finishedReplaysPromise = Promise[Unit]();
 
     scuttlebuttDriver.myEventsByPersistenceId(persistenceId, fromSequenceNr, toSequenceNr, (closer: Runnable) => {
-      new PersistentReprStreamHandler(objectMapper, closer, recoveryCallback, finishedReplaysPromise)
+      new PersistentReprStreamHandler(objectMapper, scuttlebuttPersistenceSerializer, closer, recoveryCallback, finishedReplaysPromise)
     })
 
     finishedReplaysPromise.future

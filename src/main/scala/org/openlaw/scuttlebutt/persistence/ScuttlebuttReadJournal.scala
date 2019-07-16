@@ -12,12 +12,11 @@ import com.typesafe.config.Config
 import org.apache.tuweni.scuttlebutt.rpc.RPCResponse
 import org.openlaw.scuttlebutt.persistence.driver.ScuttlebuttDriver
 import org.openlaw.scuttlebutt.persistence.reader.{PageStream, ScuttlebuttStreamRangeFiller}
-import org.openlaw.scuttlebutt.persistence.serialization.PersistedMessage
+import org.openlaw.scuttlebutt.persistence.serialization.{PersistedMessage, ScuttlebuttPersistenceSerializer}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.util.{Try}
-
+import scala.util.Try
 import scala.concurrent.blocking
 
 
@@ -25,15 +24,13 @@ class ScuttlebuttReadJournal(
                               system: ExtendedActorSystem,
                               config: Config,
                               scuttlebuttDriver: ScuttlebuttDriver,
-                              objectMapper: ObjectMapper) extends ReadJournal
+                              objectMapper: ObjectMapper,
+                              scuttlebuttPersistenceSerializer: ScuttlebuttPersistenceSerializer) extends ReadJournal
   with akka.persistence.query.scaladsl.EventsByTagQuery
   with akka.persistence.query.scaladsl.EventsByPersistenceIdQuery
   with akka.persistence.query.scaladsl.CurrentEventsByPersistenceIdQuery
   with akka.persistence.query.scaladsl.PersistenceIdsQuery
   with akka.persistence.query.scaladsl.CurrentPersistenceIdsQuery {
-
-
-  val eventAdapters = Persistence(system).adaptersFor("scuttlebutt-journal")
 
   val rangeFiller = new ScuttlebuttStreamRangeFiller(scuttlebuttDriver, objectMapper)
 
@@ -213,6 +210,7 @@ class ScuttlebuttReadJournal(
   }
 
   private def toEnvelopeWithStartSequence(rpcMessage: RPCResponse): (EventEnvelope, Long) = {
+
     val content: ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])
 
     val sequence = content.get("scuttlebuttSequence").asLong()
@@ -229,18 +227,16 @@ class ScuttlebuttReadJournal(
 
   private def toEnvelope(content: ObjectNode): EventEnvelope = {
     val payload: JsonNode = content.findPath("payload")
-
     val persistentRepr: PersistentRepr = objectMapper.treeToValue(content, classOf[PersistedMessage])
 
-    val eventAdapter = eventAdapters.get(payload.getClass)
-
-    val deserializedPayload = eventAdapter.fromJournal(payload, persistentRepr.manifest).events.head
+    val bytes = objectMapper.writeValueAsBytes(payload)
+    val deserializePayload = scuttlebuttPersistenceSerializer.deserialize(bytes, persistentRepr.manifest).get
 
     new EventEnvelope(
       Sequence(persistentRepr.sequenceNr),
       persistentRepr.persistenceId,
       persistentRepr.sequenceNr,
-      deserializedPayload
+      deserializePayload
     )
 
   }

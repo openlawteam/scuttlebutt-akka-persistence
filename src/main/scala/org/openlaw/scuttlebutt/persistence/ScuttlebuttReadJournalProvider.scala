@@ -4,9 +4,10 @@ import akka.actor.ExtendedActorSystem
 import akka.persistence.Persistence
 import akka.persistence.query.scaladsl.ReadJournal
 import akka.persistence.query.{ReadJournalProvider, javadsl}
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.typesafe.config.Config
 import org.openlaw.scuttlebutt.persistence.driver.{MultiplexerLoader, ScuttlebuttDriver}
-import org.openlaw.scuttlebutt.persistence.serialization.ScuttlebuttPersistenceSerializationConfig
+import org.openlaw.scuttlebutt.persistence.serialization.ScuttlebuttPersistenceSerializer
 
 class ScuttlebuttReadJournalProvider(system: ExtendedActorSystem, config: Config) extends ReadJournalProvider {
 
@@ -19,12 +20,14 @@ class ScuttlebuttReadJournalProvider(system: ExtendedActorSystem, config: Config
   }
 
   private def scalaJournal(): ScuttlebuttReadJournal = {
-    val objectMapper = new ScuttlebuttPersistenceSerializationConfig().mapper
+
+    val serializer =  new ScuttlebuttPersistenceSerializer(system)
+    val objectMapper = serializer.getObjectMapper()
 
     val multiplexerLoader =  new MultiplexerLoader(objectMapper, config)
-    val scuttlebuttDriver = new ScuttlebuttDriver(multiplexerLoader.loadMultiplexer, objectMapper)
+    val scuttlebuttDriver = new ScuttlebuttDriver(multiplexerLoader.loadMultiplexer, objectMapper, serializer)
 
-    new ScuttlebuttReadJournal(system, config, scuttlebuttDriver, objectMapper)
+    new ScuttlebuttReadJournal(system, config, scuttlebuttDriver, objectMapper, serializer)
   }
 
 }

@@ -12,7 +12,8 @@ case class PersistedMessage (
                               sequenceNr: Long,
                               writerUuid: String,
                               deleted: Boolean,
-                              sender: ActorRef) extends PersistentRepr {
+                              sender: ActorRef,
+                              `type`: String = "akka-persistence-message") extends PersistentRepr {
 
 
   override def withPayload(payload: Any): PersistentRepr = {

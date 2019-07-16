@@ -1,5 +1,6 @@
 package org.openlaw.scuttlebutt.persistence.driver
 
+import java.io.ByteArrayInputStream
 import java.util
 import java.util.function.Function
 
@@ -14,12 +15,17 @@ import org.apache.tuweni.scuttlebutt.rpc.mux.{Multiplexer, ScuttlebuttStreamHand
 import org.openlaw.scuttlebutt.persistence.converters.FutureConverters
 import org.openlaw.scuttlebutt.persistence.converters.FutureConverters.asyncResultToFuture
 import org.openlaw.scuttlebutt.persistence.model.StreamOptions
+import org.openlaw.scuttlebutt.persistence.serialization.{PersistedMessage, ScuttlebuttPersistenceSerializer}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success, Try}
 
-class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
+class ScuttlebuttDriver(
+                         multiplexer: Multiplexer,
+                         objectMapper: ObjectMapper,
+                         scuttlebuttPersistenceSerializer: ScuttlebuttPersistenceSerializer
+                       ) {
 
   def publishPersistentRep(persistentRepr: PersistentRepr): Future[Try[Unit]] = {
     val message = makeRPCMessage(persistentRepr)
@@ -118,7 +124,7 @@ class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
   }
 
   private def stringStreamToArrayHandler(request: RPCStreamRequest) = {
-    var promise: Promise[List[String]] = Promise()
+    val promise: Promise[List[String]] = Promise()
 
     multiplexer.openStream(request, (stopper) => {
       new ScuttlebuttStreamHandler {
@@ -183,13 +189,24 @@ class ScuttlebuttDriver(multiplexer: Multiplexer, objectMapper: ObjectMapper) {
 
   private def makeRPCMessage(persistentRep: PersistentRepr): RPCAsyncRequest = {
 
+    val payload = persistentRep.payload.asInstanceOf[AnyRef]
+    val bytes = scuttlebuttPersistenceSerializer.serialize(payload).get
+    val tree = objectMapper.reader().readTree(new ByteArrayInputStream(bytes))
+
     val func: RPCFunction = new RPCFunction(util.Arrays.asList("akkaPersistenceIndex", "events"), "persistEvent")
+
     val repWithClassName: PersistentRepr = persistentRep.withManifest(persistentRep.payload.getClass.getName)
-    val reqBody: ObjectNode = objectMapper.valueToTree(repWithClassName)
+    val withPayload = repWithClassName.withPayload(tree)
 
-    val typeNode = JsonNodeFactory.instance.textNode("akka-persistence-message")
-
-    reqBody.set("type", typeNode)
+    val reqBody = PersistedMessage(
+      withPayload.payload,
+      withPayload.manifest,
+      withPayload.persistenceId,
+      withPayload.sequenceNr,
+      withPayload.writerUuid,
+      withPayload.deleted,
+      withPayload.sender
+    )
 
     new RPCAsyncRequest(func, util.Arrays.asList(reqBody))
   }
