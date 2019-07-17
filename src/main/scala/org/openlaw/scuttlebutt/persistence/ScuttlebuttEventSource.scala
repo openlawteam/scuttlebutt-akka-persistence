@@ -12,6 +12,12 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, Promise, blocking}
 import scala.util.Success
 
+object ScuttlebuttEventSource {
+
+  val pool = java.util.concurrent.Executors.newCachedThreadPool()
+
+}
+
 class ScuttlebuttEventSource(
                                scuttlebuttDriver: ScuttlebuttDriver,
                                persistenceId: String,
@@ -69,17 +75,20 @@ class ScuttlebuttEventSource(
       setHandler(out, new OutHandler {
 
         override def onPull(): Unit = {
-          Future[Unit] {
-            blocking {
+
+          ScuttlebuttEventSource.pool.submit(new Runnable() {
+
+            override def run(): Unit = {
               // Wait for a new item to become available over the stream before pushing it
               val item = concurrentQueue.take()
 
               item match {
                 case None => complete(out)
                 case Some(streamItem) => pushNewCallback.invoke(streamItem)
-              }
-            }
-          }
+              }}
+
+          })
+
         }
 
       })
