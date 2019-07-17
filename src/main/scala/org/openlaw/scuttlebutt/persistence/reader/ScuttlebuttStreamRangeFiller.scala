@@ -1,5 +1,7 @@
 package org.openlaw.scuttlebutt.persistence.reader
 
+import akka.NotUsed
+import akka.stream.javadsl.Source
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.tuweni.scuttlebutt.rpc.RPCResponse
 import org.apache.tuweni.scuttlebutt.rpc.mux.ScuttlebuttStreamHandler
@@ -36,7 +38,7 @@ class ScuttlebuttStreamRangeFiller(
 
     var promise: Promise[Seq[RPCResponse]] = Promise()
 
-    driver.eventsByPersistenceId(author, persistenceId, fromSequenceNr, toSequenceNr, (stopper) => {
+    driver.eventsByPersistenceId(author, persistenceId, fromSequenceNr, toSequenceNr, false, (stopper) => {
       new ScuttlebuttStreamHandler {
         var results: Seq[RPCResponse] = Seq()
 

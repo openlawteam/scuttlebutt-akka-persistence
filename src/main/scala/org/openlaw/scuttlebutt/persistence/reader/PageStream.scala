@@ -11,8 +11,6 @@ import com.typesafe.config.Config
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.blocking
 
-
-
 object PageStream {
 
   def defaultNextPage[T](start: Long, result: Seq[T]): Long = {
