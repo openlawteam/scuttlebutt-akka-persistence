@@ -67,7 +67,7 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
   ) = {
     val finishedReplaysPromise = Promise[Unit]();
 
-    scuttlebuttDriver.myEventsByPersistenceId(persistenceId, fromSequenceNr, toSequenceNr, (closer: Runnable) => {
+    scuttlebuttDriver.myEventsByPersistenceId(persistenceId, fromSequenceNr, toSequenceNr, false, (closer: Runnable) => {
       new PersistentReprStreamHandler(objectMapper, scuttlebuttPersistenceSerializer, closer, recoveryCallback, finishedReplaysPromise)
     })
 

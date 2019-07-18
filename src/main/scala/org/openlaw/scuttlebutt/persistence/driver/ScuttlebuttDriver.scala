@@ -46,17 +46,19 @@ class ScuttlebuttDriver(
   def myEventsByPersistenceId(persistenceId: String,
                               fromSequenceNr: Long,
                               toSequenceNr: Long,
+                              live: Boolean,
                               handler: Function[Runnable, ScuttlebuttStreamHandler]) = {
 
 
     // 'null' for the author field is a shortcut for 'my ident'.
-    eventsByPersistenceId(null, persistenceId, fromSequenceNr, toSequenceNr, handler)
+    eventsByPersistenceId(null, persistenceId, fromSequenceNr, toSequenceNr, live, handler)
   }
 
   def eventsByPersistenceId(author: String,
                             persistenceId: String,
                             fromSequenceNr: Long,
                             toSequenceNr: Long,
+                            live: Boolean,
                             handler: Function[Runnable, ScuttlebuttStreamHandler]) = {
 
     val function: RPCFunction = new RPCFunction(
@@ -67,17 +69,10 @@ class ScuttlebuttDriver(
        author.asInstanceOf[Object],
       persistenceId.asInstanceOf[Object],
       fromSequenceNr.asInstanceOf[Object],
-      toSequenceNr.asInstanceOf[Object]))
+      toSequenceNr.asInstanceOf[Object],
+      live.asInstanceOf[Object]))
 
     multiplexer.openStream(request, handler)
-  }
-
-  // TODO: better query representation than an ObjectNode
-  def openQueryStream(query: ObjectNode, streamHandler: Function[Runnable, ScuttlebuttStreamHandler]) = {
-    val function: RPCFunction = new RPCFunction(util.Arrays.asList("query"), "read")
-    val request: RPCStreamRequest = new RPCStreamRequest(function, util.Arrays.asList(query))
-
-    multiplexer.openStream(request, streamHandler)
   }
 
   def currentPersistenceIds(): Future[Try[List[String]]] = {

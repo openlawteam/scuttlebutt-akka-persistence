@@ -14,9 +14,9 @@ import org.openlaw.scuttlebutt.persistence.driver.ScuttlebuttDriver
 import org.openlaw.scuttlebutt.persistence.reader.{PageStream, ScuttlebuttStreamRangeFiller}
 import org.openlaw.scuttlebutt.persistence.serialization.{PersistedMessage, ScuttlebuttPersistenceSerializer}
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Try
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.blocking
 
 
@@ -190,25 +190,6 @@ class ScuttlebuttReadJournal(
   override def eventsByTag(
                             tag: String, offset: Offset = Sequence(0L)): Source[EventEnvelope, NotUsed] = ???
 
-  private def pollUntilAvailable(persistenceId: String, start: Long, max: Long, end: Long, author: String = null): Future[Seq[EventEnvelope]] = {
-    // Scuttlebutt does not implement back pressure so (like many other persistence plugins) we have to poll until
-    // more is available
-
-    rangeFiller.getEventMessages(persistenceId, start, max, end, author).map(events => events.map(toEnvelope)).flatMap {
-      case events if events.isEmpty => {
-
-        val sleep: Future[Unit] = Future[Unit] {
-          blocking {
-            Thread.sleep(config.getDuration("refresh-interval").toMillis)
-          }
-        }
-
-        sleep.flatMap(_ => pollUntilAvailable(persistenceId, start, max, end, author))
-      }
-      case events => Future.successful(events)
-    }
-  }
-
   private def toEnvelopeWithStartSequence(rpcMessage: RPCResponse): (EventEnvelope, Long) = {
 
     val content: ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])
@@ -249,28 +230,10 @@ class ScuttlebuttReadJournal(
                                            author: String = null): Source[EventEnvelope, NotUsed] = {
     val step = config.getInt("max-buffer-size")
 
-    val eventSource = Source.unfoldAsync[Long, Seq[EventEnvelope]](0) {
+    val graph = new ScuttlebuttEventSource(
+      scuttlebuttDriver, persistenceId, fromSequenceNr, toSequenceNr, author, live )
 
-      case start if start >= toSequenceNr => Future.successful(None)
-      case start => {
-        val end = Math.min(start + step, toSequenceNr)
-
-        if (live) {
-          pollUntilAvailable(persistenceId, start, step, end, author).map(
-            results => Some((start + results.length) -> results)
-          )
-        } else {
-          rangeFiller.getEventMessages(persistenceId, start, step, end, author)
-            .map(rpcMessages => rpcMessages.map(toEnvelope)).map {
-            case events if events.isEmpty => None
-            case events => Some((start + events.length) -> events)
-          }
-
-        }
-      }
-    }
-
-    eventSource.flatMapConcat(events => Source.fromIterator(() => events.iterator))
+    Source.fromGraph(graph).map(toEnvelope)
   }
 
 }
