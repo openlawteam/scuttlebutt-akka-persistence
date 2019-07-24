@@ -35,8 +35,30 @@ class ScuttlebuttEventSource(
         // to invoke it on the appropriate thread from another thread
         val pushNewCallback = getAsyncCallback[RPCResponse](item => push(out, item))
         val completeStream = getAsyncCallback[Unit]((_) => complete(out))
+        val failStream = getAsyncCallback[Exception](ex => fail(out, ex))
 
         actor = actorSystem.actorOf(Props(classOf[ScuttlebuttEventActor],  pushNewCallback, completeStream))
+
+        scuttlebuttDriver.eventsByPersistenceId(author, persistenceId, start, end, live,
+          (streamStopper) => new ScuttlebuttStreamHandler() {
+
+            downStreamEnded.foreach(_ => streamStopper.run())
+
+            override def onMessage(message: RPCResponse): Unit = {
+              actor ! message
+            }
+
+            override def onStreamEnd(): Unit = {
+              // Signal that there will be no more elements by populating the queue with "None"
+              // so that the source can be closed
+
+              actor ! StreamEnd()
+            }
+
+            override def onStreamError(ex: Exception): Unit = {
+              failStream.invoke(ex)
+            }
+          })
       }
 
       override def postStop(): Unit = {
@@ -47,27 +69,6 @@ class ScuttlebuttEventSource(
         actor ! PoisonPill
         downStreamEndedPromise.complete(Success(true))
       }
-
-      scuttlebuttDriver.eventsByPersistenceId(author, persistenceId, start, end, live,
-        (streamStopper) => new ScuttlebuttStreamHandler() {
-
-          downStreamEnded.foreach(_ => streamStopper.run())
-
-          override def onMessage(message: RPCResponse): Unit = {
-            actor ! message
-          }
-
-          override def onStreamEnd(): Unit = {
-            // Signal that there will be no more elements by populating the queue with "None"
-            // so that the source can be closed
-
-            actor ! StreamEnd()
-          }
-
-          override def onStreamError(ex: Exception): Unit = {
-            fail(out, ex)
-          }
-        })
 
       setHandler(out, new OutHandler {
         override def onPull(): Unit = {
