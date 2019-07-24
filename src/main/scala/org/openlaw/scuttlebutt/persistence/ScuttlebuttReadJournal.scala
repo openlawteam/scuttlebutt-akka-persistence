@@ -230,7 +230,7 @@ class ScuttlebuttReadJournal(
                                            author: String = null): Source[EventEnvelope, NotUsed] = {
     val step = config.getInt("max-buffer-size")
 
-    val graph = new ScuttlebuttEventSource(
+    val graph = new ScuttlebuttEventSource(system,
       scuttlebuttDriver, persistenceId, fromSequenceNr, toSequenceNr, author, live )
 
     Source.fromGraph(graph).map(toEnvelope)

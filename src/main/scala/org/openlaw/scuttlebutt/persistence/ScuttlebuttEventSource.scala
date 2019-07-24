@@ -1,7 +1,6 @@
 package org.openlaw.scuttlebutt.persistence
 
-import java.util.concurrent.{BlockingDeque, BlockingQueue, ConcurrentLinkedQueue, LinkedBlockingDeque}
-
+import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.stream.{Attributes, Outlet, SourceShape}
 import akka.stream.stage.{AsyncCallback, GraphStage, GraphStageLogic, OutHandler}
 import org.apache.tuweni.scuttlebutt.rpc.RPCResponse
@@ -9,16 +8,11 @@ import org.apache.tuweni.scuttlebutt.rpc.mux.ScuttlebuttStreamHandler
 import org.openlaw.scuttlebutt.persistence.driver.ScuttlebuttDriver
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Future, Promise, blocking}
+import scala.concurrent.Promise
 import scala.util.Success
 
-object ScuttlebuttEventSource {
-
-  val pool = java.util.concurrent.Executors.newCachedThreadPool()
-
-}
-
 class ScuttlebuttEventSource(
+                               actorSystem: ActorSystem,
                                scuttlebuttDriver: ScuttlebuttDriver,
                                persistenceId: String,
                                start: Long,
@@ -34,14 +28,15 @@ class ScuttlebuttEventSource(
       val downStreamEndedPromise = Promise[Boolean]()
       val downStreamEnded = downStreamEndedPromise.future
 
-      val concurrentQueue = new LinkedBlockingDeque[Option[RPCResponse]] ()
-
-      var pushNewCallback: AsyncCallback[RPCResponse] = null;
+      var actor: ActorRef = null;
 
       override def preStart(): Unit = {
         // "push" cannot be called in another thread, but we can use this mechanism
         // to invoke it on the appropriate thread from another thread
-        pushNewCallback = getAsyncCallback(item => push(out, item))
+        val pushNewCallback = getAsyncCallback[RPCResponse](item => push(out, item))
+        val completeStream = getAsyncCallback[Unit]((_) => complete(out))
+
+        actor = actorSystem.actorOf(Props(classOf[ScuttlebuttEventActor],  pushNewCallback, completeStream))
       }
 
       override def postStop(): Unit = {
@@ -49,6 +44,7 @@ class ScuttlebuttEventSource(
         // scuttlebutt stream - however, the 'stopper' is in another thread so we use
         // a promise to future to close it in a thread safe way from the stream
         // consuming thread
+        actor ! PoisonPill
         downStreamEndedPromise.complete(Success(true))
       }
 
@@ -58,13 +54,14 @@ class ScuttlebuttEventSource(
           downStreamEnded.foreach(_ => streamStopper.run())
 
           override def onMessage(message: RPCResponse): Unit = {
-            concurrentQueue.put(Some(message))
+            actor ! message
           }
 
           override def onStreamEnd(): Unit = {
             // Signal that there will be no more elements by populating the queue with "None"
             // so that the source can be closed
-            concurrentQueue.put(None)
+
+            actor ! StreamEnd()
           }
 
           override def onStreamError(ex: Exception): Unit = {
@@ -73,24 +70,9 @@ class ScuttlebuttEventSource(
         })
 
       setHandler(out, new OutHandler {
-
         override def onPull(): Unit = {
-
-          ScuttlebuttEventSource.pool.submit(new Runnable() {
-
-            override def run(): Unit = {
-              // Wait for a new item to become available over the stream before pushing it
-              val item = concurrentQueue.take()
-
-              item match {
-                case None => complete(out)
-                case Some(streamItem) => pushNewCallback.invoke(streamItem)
-              }}
-
-          })
-
+          actor ! ReadyForNext()
         }
-
       })
 
     }
