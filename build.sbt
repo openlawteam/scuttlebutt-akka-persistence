@@ -24,10 +24,10 @@ libraryDependencies += "com.github.jnr" % "jffi" % "1.2.18"
 
 libraryDependencies += "com.fasterxml.jackson.datatype" % "jackson-datatype-jsr310" % "2.9.8"
 
-libraryDependencies += "org.openlaw" % "tuweni-scuttlebutt" % "0.8.0"
-libraryDependencies += "org.openlaw" % "tuweni-scuttlebutt-rpc" % "0.8.0"
-libraryDependencies += "org.openlaw" % "tuweni-scuttlebutt-handshake" % "0.8.0"
-libraryDependencies += "org.openlaw" % "tuweni-crypto" % "0.8.0"
+libraryDependencies += "org.openlaw" % "tuweni-scuttlebutt" % "0.9.0"
+libraryDependencies += "org.openlaw" % "tuweni-scuttlebutt-rpc" % "0.9.0"
+libraryDependencies += "org.openlaw" % "tuweni-scuttlebutt-handshake" % "0.9.0"
+libraryDependencies += "org.openlaw" % "tuweni-crypto" % "0.9.0"
 
 updateOptions := updateOptions.value.withLatestSnapshots(false)
 
