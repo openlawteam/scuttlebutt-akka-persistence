@@ -49,14 +49,4 @@ object KeyUtils {
     }
   }
 
-  def getLocalKeys(): Option[Signature.KeyPair] = {
-
-    val ssbDir: Option[String] = Option(System.getenv.get("ssb_dir"))
-    val homePath: Option[String] = Option(System.getProperty("user.home")).map((home: String) => home + "/.ssb")
-
-    val localPath: Option[String] = ssbDir.orElse(homePath)
-
-    localPath.flatMap(getKeysAtPath)
-  }
-
 }

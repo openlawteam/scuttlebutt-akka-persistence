@@ -37,8 +37,9 @@ The following values can be configured:
 scuttlebutt-journal {
 
     secret {
-        # Defaults to ~/.ssb/secret
-        path: "/path/to/scuttlebutt/secret/file"
+        # It is an option to override this with the SSB_PERSISTENCE_DIR environment variable,
+        # or override it in your application config file.
+        path: "..."
     }
 
     # The scuttlebot host
@@ -63,9 +64,11 @@ org.openlaw.scuttlebutt.journal.persistence {
 
   max-buffer-size: 100,
 
-  secret {
-    path: null
-  }
+   secret {
+        # It is an option to override this with the SSB_PERSISTENCE_DIR environment variable,
+        # or override it in your application config file.
+        path: "..."
+   }
 
   host = "localhost"
   port = 8008

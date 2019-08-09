@@ -35,7 +35,8 @@ class MultiplexerLoader(objectMapper: ObjectMapper, scuttlebuttConf: Config) {
     // TODO: make it possible to modify the host, etc, in the akka config
 
     if (!keyPair.isDefined) {
-      throw new Exception("Could not find local scuttlebutt keys.")
+      val error = "Could not find scuttlebutt keys at the configured ssb persistence directory (checked keys.path setting and SSB_PERSISTENCE_DIR environment variable.)"
+      throw new Exception(error)
     }
 
     val localKeys = keyPair.get
@@ -67,7 +68,7 @@ class MultiplexerLoader(objectMapper: ObjectMapper, scuttlebuttConf: Config) {
       KeyUtils.getKeysAtPath(scuttlebuttConf.getString("secret.path"))
     }
     else {
-      KeyUtils.getLocalKeys()
+      return None
     }
   }
 
