@@ -71,7 +71,6 @@ class MultiplexerLoader(objectMapper: ObjectMapper, scuttlebuttConf: Config) {
       val error = "secret.path and secret.base64 configuration values are both defined. Only one value should be defined."
       throw new Exception(error)
     } else if (scuttlebuttConf.hasPath(secretBase64ConfigPath)) {
-      println("BASE 64")
       KeyUtils.getKeysFromBase64(scuttlebuttConf.getString(secretBase64ConfigPath))
     }
     else if (scuttlebuttConf.hasPath(secretKeyFileConfigPath)) {

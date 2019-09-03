@@ -19,8 +19,6 @@ object KeyUtils {
     // Generated ssb secret keys often have a warning at the top prefixed by a hash.
     // We remove these if they're present.
     val commentsRemoved = jsonString.lines.filterNot(line => line.startsWith("#")).mkString("")
-    println(commentsRemoved)
-
     Some(fromKeyJSON(commentsRemoved))
   }
 
