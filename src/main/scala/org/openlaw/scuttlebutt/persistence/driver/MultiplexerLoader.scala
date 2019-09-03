@@ -35,7 +35,7 @@ class MultiplexerLoader(objectMapper: ObjectMapper, scuttlebuttConf: Config) {
     // TODO: make it possible to modify the host, etc, in the akka config
 
     if (!keyPair.isDefined) {
-      val error = "Could not find scuttlebutt keys at the configured ssb persistence directory (checked keys.path setting and SSB_PERSISTENCE_DIR environment variable.)"
+      val error = "Could not find scuttlebutt keys at the configured ssb persistence directory (checked keys.path and keys.base64 settings and the SSB_KEYPATH and SSB_SECRET_KEYPAIR environment variables."
       throw new Exception(error)
     }
 
@@ -64,8 +64,18 @@ class MultiplexerLoader(objectMapper: ObjectMapper, scuttlebuttConf: Config) {
   }
 
   private def getKeys(): Option[Signature.KeyPair] = {
-    if (scuttlebuttConf.hasPath("secret.path")) {
-      KeyUtils.getKeysAtPath(scuttlebuttConf.getString("secret.path"))
+    val secretBase64ConfigPath = "secret.base64"
+    val secretKeyFileConfigPath = "secret.path"
+
+    if (scuttlebuttConf.hasPath(secretBase64ConfigPath) && scuttlebuttConf.hasPath(secretKeyFileConfigPath)) {
+      val error = "secret.path and secret.base64 configuration values are both defined. Only one value should be defined."
+      throw new Exception(error)
+    } else if (scuttlebuttConf.hasPath(secretBase64ConfigPath)) {
+      println("BASE 64")
+      KeyUtils.getKeysFromBase64(scuttlebuttConf.getString(secretBase64ConfigPath))
+    }
+    else if (scuttlebuttConf.hasPath(secretKeyFileConfigPath)) {
+      KeyUtils.getKeysAtPath(scuttlebuttConf.getString(secretKeyFileConfigPath))
     }
     else {
       return None

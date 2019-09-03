@@ -13,8 +13,18 @@ import org.apache.tuweni.io.Base64
 
 object KeyUtils {
 
-  def getKeysAtPath(path: String): Option[Signature.KeyPair] = {
-    val secretPath: String = path + "/secret"
+  def getKeysFromBase64(base64: String): Option[Signature.KeyPair] = {
+    val jsonString = new String(Base64.decode(base64).toArray)
+
+    // Generated ssb secret keys often have a warning at the top prefixed by a hash.
+    // We remove these if they're present.
+    val commentsRemoved = jsonString.lines.filterNot(line => line.startsWith("#")).mkString("")
+    println(commentsRemoved)
+
+    Some(fromKeyJSON(commentsRemoved))
+  }
+
+  def getKeysAtPath(secretPath: String): Option[Signature.KeyPair] = {
     val file: File = new File(secretPath)
 
     if (!file.exists) None
@@ -33,20 +43,24 @@ object KeyUtils {
 
       val secretJSON: String = String.join("", list)
 
-      val mapper: ObjectMapper = new ObjectMapper
-
-      val values: util.HashMap[String, String] = mapper.readValue(secretJSON, new TypeReference[util.Map[String, String]]() {})
-      val pubKey: String = values.get("public").replace(".ed25519", "")
-      val privateKey: String = values.get("private").replace(".ed25519", "")
-
-      val pubKeyBytes: Bytes = Base64.decode(pubKey)
-      val privateKeyBytes: Bytes = Base64.decode(privateKey)
-
-      val pub: Signature.PublicKey = Signature.PublicKey.fromBytes(pubKeyBytes)
-      val secretKey: Signature.SecretKey = Signature.SecretKey.fromBytes(privateKeyBytes)
-
-      return Some(new Signature.KeyPair(pub, secretKey))
+      Some(fromKeyJSON(secretJSON))
     }
+  }
+
+  private def fromKeyJSON(secretJson: String): Signature.KeyPair = {
+    val mapper: ObjectMapper = new ObjectMapper
+
+    val values: util.HashMap[String, String] = mapper.readValue(secretJson, new TypeReference[util.Map[String, String]]() {})
+    val pubKey: String = values.get("public").replace(".ed25519", "")
+    val privateKey: String = values.get("private").replace(".ed25519", "")
+
+    val pubKeyBytes: Bytes = Base64.decode(pubKey)
+    val privateKeyBytes: Bytes = Base64.decode(privateKey)
+
+    val pub: Signature.PublicKey = Signature.PublicKey.fromBytes(pubKeyBytes)
+    val secretKey: Signature.SecretKey = Signature.SecretKey.fromBytes(privateKeyBytes)
+
+    return new Signature.KeyPair(pub, secretKey)
   }
 
 }
