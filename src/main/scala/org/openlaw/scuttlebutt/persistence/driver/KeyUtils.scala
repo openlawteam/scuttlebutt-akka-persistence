@@ -35,7 +35,7 @@ object KeyUtils {
 
       val mapper: ObjectMapper = new ObjectMapper
 
-      val values: util.HashMap[String, String] = mapper.readValue(secretJSON, new TypeReference[util.Map[String, String]]() {})
+      val values: util.Map[String, String] = mapper.readValue(secretJSON, new TypeReference[util.Map[String, String]]() {})
       val pubKey: String = values.get("public").replace(".ed25519", "")
       val privateKey: String = values.get("private").replace(".ed25519", "")
 
