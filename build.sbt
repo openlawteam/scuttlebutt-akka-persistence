@@ -11,9 +11,9 @@ libraryDependencies += "com.typesafe.akka" %% "akka-persistence" % "2.5.21"
 libraryDependencies += "com.typesafe.akka" %% "akka-persistence-query" % "2.5.21"
 libraryDependencies += "com.typesafe.akka" %% "akka-stream" % "2.5.21"
 
-libraryDependencies += "com.fasterxml.jackson.core" % "jackson-core" % "2.9.8"
-libraryDependencies += "com.fasterxml.jackson.core" % "jackson-databind" % "2.9.8"
-libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.9.8"
+libraryDependencies += "com.fasterxml.jackson.core" % "jackson-core" % "2.10.0.pr1"
+libraryDependencies += "com.fasterxml.jackson.core" % "jackson-databind" % "2.10.0.pr1"
+libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.10.0.pr1"
 libraryDependencies += "io.vertx" % "vertx-core" % "3.6.2"
 
 libraryDependencies += "org.logl" % "logl-logl" % "0.4.0-24B971-snapshot"
