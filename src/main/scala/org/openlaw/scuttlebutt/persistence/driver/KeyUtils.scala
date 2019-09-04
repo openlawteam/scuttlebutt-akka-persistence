@@ -4,6 +4,7 @@ import java.io.File
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util
 import java.util.Scanner
+import java.util.stream.Collectors
 
 import com.fasterxml.jackson.core.`type`.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -13,35 +14,45 @@ import org.apache.tuweni.io.Base64
 
 object KeyUtils {
 
-  def getKeysFromBase64(base64: String): Option[Signature.KeyPair] = {
-    val jsonString = new String(Base64.decode(base64).toArray)
+  def getKeysFromBase64(base64: String): Option[Signature.KeyPair] = { 
+    try {
+      val jsonString = new String(Base64.decode(base64).toArray)
 
-    // Generated ssb secret keys often have a warning at the top prefixed by a hash.
-    // We remove these if they're present.
-    val commentsRemoved = jsonString.lines.filterNot(line => line.startsWith("#")).mkString("")
-    Some(fromKeyJSON(commentsRemoved))
+      // Generated ssb secret keys often have a warning at the top prefixed by a hash.
+      // We remove these if they're present.
+      val commentsRemoved = jsonString.lines.filter(line => !line.startsWith("#")).collect(Collectors.joining(""))
+      Some(fromKeyJSON(commentsRemoved))
+    }
+    catch {
+      case e: Exception => None
+    }
   }
 
   def getKeysAtPath(secretPath: String): Option[Signature.KeyPair] = {
-    val file: File = new File(secretPath)
+    try {
+      val file: File = new File(secretPath)
 
-    if (!file.exists) None
-    else {
-      val s: Scanner = new Scanner(file, UTF_8.name)
-      s.useDelimiter("\n")
+      if (!file.exists) None
+      else {
+        val s: Scanner = new Scanner(file, UTF_8.name)
+        s.useDelimiter("\n")
 
-      val list: util.ArrayList[String] = new util.ArrayList[String]
-      while ( {
-        s.hasNext
-      }) {
-        val next: String = s.next
-        // Filter out the comment lines
-        if (!next.startsWith("#")) list.add(next)
-      }
+        val list: util.ArrayList[String] = new util.ArrayList[String]
+        while ( {
+          s.hasNext
+        }) {
+          val next: String = s.next
+          // Filter out the comment lines
+          if (!next.startsWith("#")) list.add(next)
+       }
 
-      val secretJSON: String = String.join("", list)
+        val secretJSON: String = String.join("", list)
 
-      Some(fromKeyJSON(secretJSON))
+        Some(fromKeyJSON(secretJSON))
+    }
+  }
+    catch {
+      case e: Exception => None
     }
   }
 
@@ -52,8 +63,15 @@ object KeyUtils {
     val pubKey: String = values.get("public").replace(".ed25519", "")
     val privateKey: String = values.get("private").replace(".ed25519", "")
 
-    val pubKeyBytes: Bytes = Base64.decode(pubKey)
-    val privateKeyBytes: Bytes = Base64.decode(privateKey)
+    val pubKeyBytes: Bytes = Base64.decode(pubKey) match {
+      case result:Bytes => result
+      case _ => throw new Exception("value could not be decoded!")
+    }
+
+    val privateKeyBytes: Bytes = Base64.decode(privateKey) match {
+      case result:Bytes => result
+      case _ => throw new Exception("value could not be decoded!")
+    }
 
     val pub: Signature.PublicKey = Signature.PublicKey.fromBytes(pubKeyBytes)
     val secretKey: Signature.SecretKey = Signature.SecretKey.fromBytes(privateKeyBytes)
