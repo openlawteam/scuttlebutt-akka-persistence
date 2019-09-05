@@ -26,7 +26,10 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
 
   val loader: MultiplexerLoader = new MultiplexerLoader(objectMapper, config)
 
-  val rpcHandler: RPCHandler = loader.loadMultiplexer
+  val rpcHandler: RPCHandler = loader.loadMultiplexer match {
+    case Left(err) => throw new Exception(err)
+    case Right(handler) => handler
+  }
   val scuttlebuttDriver: ScuttlebuttDriver = new ScuttlebuttDriver(rpcHandler, objectMapper, scuttlebuttPersistenceSerializer)
 
   override def asyncWriteMessages(messages: immutable.Seq[AtomicWrite]): Future[immutable.Seq[Try[Unit]]] = {
