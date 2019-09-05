@@ -25,9 +25,15 @@ class ScuttlebuttReadJournalProvider(system: ExtendedActorSystem, config: Config
     val objectMapper = serializer.getObjectMapper()
 
     val multiplexerLoader =  new MultiplexerLoader(objectMapper, config)
-    val scuttlebuttDriver = new ScuttlebuttDriver(multiplexerLoader.loadMultiplexer, objectMapper, serializer)
 
-    new ScuttlebuttReadJournal(system, config, scuttlebuttDriver, objectMapper, serializer)
+    multiplexerLoader.loadMultiplexer match {
+      case Left(error) => throw new Exception(error)
+      case Right(rpcHandler) => {
+        val scuttlebuttDriver = new ScuttlebuttDriver(rpcHandler, objectMapper, serializer)
+        new ScuttlebuttReadJournal(system, config, scuttlebuttDriver, objectMapper, serializer)
+      }
+    }
+
   }
 
 }
