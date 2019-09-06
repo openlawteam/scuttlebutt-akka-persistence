@@ -112,6 +112,15 @@ class ScuttlebuttReadJournal(
   }
 
   /**
+    * Gets the identity (public key) of the scuttlebutt instance we're connected to
+    *
+    * @return
+    */
+  def getMyIdentity(): Future[Try[String]] = {
+    scuttlebuttDriver.getMyIdentity()
+  }
+
+  /**
     *
     * @param authorId the ID of the author (instance) for the events
     * @param live whether this stream should remain open and emit any new persistence IDs for the given author (defaults to false)

@@ -14,7 +14,7 @@ import org.apache.tuweni.scuttlebutt.rpc.mux.exceptions.ConnectionClosedExceptio
 import org.apache.tuweni.scuttlebutt.rpc.mux.{Multiplexer, ScuttlebuttStreamHandler}
 import org.openlaw.scuttlebutt.persistence.converters.FutureConverters
 import org.openlaw.scuttlebutt.persistence.converters.FutureConverters.asyncResultToFuture
-import org.openlaw.scuttlebutt.persistence.model.StreamOptions
+import org.openlaw.scuttlebutt.persistence.model.{StreamOptions, WhoAmIResponse}
 import org.openlaw.scuttlebutt.persistence.serialization.{PersistedMessage, ScuttlebuttPersistenceSerializer}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -106,6 +106,21 @@ class ScuttlebuttDriver(
     val request: RPCStreamRequest = new RPCStreamRequest(function, util.Arrays.asList(persistenceId))
 
     stringStreamToArrayHandler(request)
+  }
+
+  /**
+    * @return the public key of the instance
+    */
+  def getMyIdentity(): Future[Try[String]] = {
+    val function: RPCFunction = new RPCFunction("whoami")
+
+    val request: RPCAsyncRequest = new RPCAsyncRequest(function, util.Arrays.asList())
+
+    asyncResultToFuture(multiplexer.makeAsyncRequest(request)).map(response => response.asJSON(
+      objectMapper, classOf[WhoAmIResponse]
+    )).map(id => Success(id.id)).recover{
+      case ex: Throwable => Failure(ex)
+    }
   }
 
   def getAllAuthors(): Future[Try[List[String]]] = {
