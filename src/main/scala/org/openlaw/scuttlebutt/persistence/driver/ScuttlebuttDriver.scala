@@ -14,7 +14,7 @@ import org.apache.tuweni.scuttlebutt.rpc.mux.exceptions.ConnectionClosedExceptio
 import org.apache.tuweni.scuttlebutt.rpc.mux.{Multiplexer, ScuttlebuttStreamHandler}
 import org.openlaw.scuttlebutt.persistence.converters.FutureConverters
 import org.openlaw.scuttlebutt.persistence.converters.FutureConverters.asyncResultToFuture
-import org.openlaw.scuttlebutt.persistence.model.{StreamOptions, WhoAmIResponse}
+import org.openlaw.scuttlebutt.persistence.model.{AuthorStreamOptions, StreamOptions, WhoAmIResponse}
 import org.openlaw.scuttlebutt.persistence.serialization.{PersistedMessage, ScuttlebuttPersistenceSerializer}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -26,6 +26,17 @@ class ScuttlebuttDriver(
                          objectMapper: ObjectMapper,
                          scuttlebuttPersistenceSerializer: ScuttlebuttPersistenceSerializer
                        ) {
+
+  def getLiveAuthorStream(handler: Function[Runnable, ScuttlebuttStreamHandler]): Unit = {
+    val function: RPCFunction = new RPCFunction(
+      util.Arrays.asList("akkaPersistenceIndex", "persistenceIds"),
+      "allOtherAuthors")
+
+    val request: RPCStreamRequest = new RPCStreamRequest(function, util.Arrays.asList(new AuthorStreamOptions(true)))
+
+    multiplexer.openStream(request, handler)
+  }
+
 
   def publishPersistentRep(persistentRepr: PersistentRepr): Future[Try[Unit]] = {
     val message = makeRPCMessage(persistentRepr)

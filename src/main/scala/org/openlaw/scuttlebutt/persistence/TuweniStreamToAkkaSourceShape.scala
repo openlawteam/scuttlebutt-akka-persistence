@@ -1,5 +1,7 @@
 package org.openlaw.scuttlebutt.persistence
 
+import java.util.function.Function
+
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.stream.{Attributes, Outlet, SourceShape}
 import akka.stream.stage.{AsyncCallback, GraphStage, GraphStageLogic, OutHandler}
@@ -11,16 +13,17 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Promise
 import scala.util.Success
 
-class ScuttlebuttEventSource(
-                               actorSystem: ActorSystem,
-                               scuttlebuttDriver: ScuttlebuttDriver,
-                               persistenceId: String,
-                               start: Long,
-                               end: Long,
-                               author: String,
-                               live: Boolean) extends GraphStage[SourceShape[RPCResponse]] {
+/**
+  * Converts a Tuweni style scuttlebutt stream to an akka stream source
+  *
+  * @param actorSystem
+  * @param streamOpener the function that when called, opens a tuweni style scuttlebutt stream
+  */
+class TuweniStreamToAkkaSourceShape(
+                              actorSystem: ActorSystem,
+                              streamOpener: Function[Runnable, ScuttlebuttStreamHandler] => Unit) extends GraphStage[SourceShape[RPCResponse]] {
 
-  val out: Outlet[RPCResponse] = Outlet("ScuttlebuttEventSource")
+  val out: Outlet[RPCResponse] = Outlet("ScuttlebuttStreamSource")
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = {
     new GraphStageLogic(shape) {
@@ -37,9 +40,9 @@ class ScuttlebuttEventSource(
         val completeStream = getAsyncCallback[Unit]((_) => complete(out))
         val failStream = getAsyncCallback[Exception](ex => fail(out, ex))
 
-        actor = actorSystem.actorOf(Props(classOf[ScuttlebuttEventActor],  pushNewCallback, completeStream))
+        actor = actorSystem.actorOf(Props(classOf[ScuttlebuttStreamActor],  pushNewCallback, completeStream))
 
-        scuttlebuttDriver.eventsByPersistenceId(author, persistenceId, start, end, live,
+        streamOpener(
           (streamStopper) => new ScuttlebuttStreamHandler() {
 
             downStreamEnded.foreach(_ => streamStopper.run())

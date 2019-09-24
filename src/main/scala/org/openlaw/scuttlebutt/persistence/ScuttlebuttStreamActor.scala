@@ -9,7 +9,7 @@ case class StreamEnd()
 
 import scala.collection.immutable.Queue
 
-class ScuttlebuttEventActor(
+class ScuttlebuttStreamActor(
                              asyncCallback: AsyncCallback[RPCResponse],
                              completeStream: AsyncCallback[Unit]
                            ) extends Actor {

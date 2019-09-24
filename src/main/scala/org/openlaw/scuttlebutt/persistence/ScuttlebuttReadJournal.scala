@@ -1,5 +1,7 @@
 package org.openlaw.scuttlebutt.persistence
 
+import java.util.function.Function
+
 import akka.NotUsed
 import akka.actor.ExtendedActorSystem
 import akka.persistence.{Persistence, PersistentRepr}
@@ -10,6 +12,7 @@ import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.typesafe.config.Config
 import org.apache.tuweni.scuttlebutt.rpc.RPCResponse
+import org.apache.tuweni.scuttlebutt.rpc.mux.ScuttlebuttStreamHandler
 import org.openlaw.scuttlebutt.persistence.driver.ScuttlebuttDriver
 import org.openlaw.scuttlebutt.persistence.reader.{PageStream, ScuttlebuttStreamRangeFiller}
 import org.openlaw.scuttlebutt.persistence.serialization.{PersistedMessage, ScuttlebuttPersistenceSerializer}
@@ -174,6 +177,22 @@ class ScuttlebuttReadJournal(
     scuttlebuttDriver.getAllAuthors()
   }
 
+  /**
+    * A live stream of all the other visible authors in the scuttlebutt network.
+    * The stream first emits currently known authors, and then emits new authors
+    * if they become visible (e.g. if our instance followed them.)
+    *
+    * @return the author stream
+    */
+  def allAuthorsLive: Source[String, NotUsed] = {
+    val handler: (Function[Runnable, ScuttlebuttStreamHandler] => Unit) =
+      (fn) => scuttlebuttDriver.getLiveAuthorStream(fn)
+
+    val graph = new TuweniStreamToAkkaSourceShape(system, handler)
+
+    Source.fromGraph(graph).map(item => item.asString())
+  }
+
 
   /**
     * All the persistence IDs the current author (instance) has created. Stream remains open and emits new values
@@ -237,10 +256,11 @@ class ScuttlebuttReadJournal(
                                            toSequenceNr: Long,
                                            live: Boolean,
                                            author: String = null): Source[EventEnvelope, NotUsed] = {
-    val step = config.getInt("max-buffer-size")
 
-    val graph = new ScuttlebuttEventSource(system,
-      scuttlebuttDriver, persistenceId, fromSequenceNr, toSequenceNr, author, live )
+    val handler: (Function[Runnable, ScuttlebuttStreamHandler] => Unit) =
+      (fn) => scuttlebuttDriver.eventsByPersistenceId(author, persistenceId, fromSequenceNr, toSequenceNr, live, fn)
+
+    val graph = new TuweniStreamToAkkaSourceShape(system, handler)
 
     Source.fromGraph(graph).map(toEnvelope)
   }

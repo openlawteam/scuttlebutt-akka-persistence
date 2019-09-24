@@ -2,7 +2,7 @@ package org.openlaw.scuttlebutt.persistence
 
 import java.util.concurrent.TimeUnit
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem, Props}
 import akka.persistence.query.{EventEnvelope, PersistenceQuery}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.Sink
@@ -22,20 +22,31 @@ object ReadJournalExample {
       "org.openlaw.scuttlebutt.journal.persistence"
     )
 
-    val source = readJournal.currentEventsByPersistenceId(
-      "sample-id-6", 0, 101
+    val source = readJournal.eventsByPersistenceId(
+      "sample-id-7", 0, 101
     )
-    //source.runWith(Sink.foreach(println))
+    source.runWith(Sink.foreach(item => println("hooray: " + item)))
 
-    readJournal.getMyIdentity().foreach(println(_))
+    val helloActor = system.actorOf(Props[ScuttlebuttPersistentActorExample], name = "persist-test-actor")
 
-    val allPersistenceIdsSource = readJournal.currentPersistenceIds()
+    Thread.sleep(5000)
+    var i = 0
+    while (i < 5) {
+      helloActor ! Cmd("new-test")
+      helloActor ! "print"
+      i = i + 1
+    }
 
-    allPersistenceIdsSource.runWith(Sink.foreach(println))
 
-    readJournal.getAllEventsForAuthor(null, live=true).runWith(Sink.foreach(println))
-
-    readJournal.allOtherAuthors().foreach(println)
+//    readJournal.getMyIdentity().foreach(println(_))
+//
+//    val allPersistenceIdsSource = readJournal.currentPersistenceIds()
+//
+//    allPersistenceIdsSource.runWith(Sink.foreach(println))
+//
+//    readJournal.getAllEventsForAuthor(null, live=true).runWith(Sink.foreach(println))
+//
+//    readJournal.allOtherAuthors().foreach(println)
 
   }
 
