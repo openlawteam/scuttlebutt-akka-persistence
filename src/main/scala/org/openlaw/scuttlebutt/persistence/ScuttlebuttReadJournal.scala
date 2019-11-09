@@ -14,6 +14,7 @@ import com.typesafe.config.Config
 import org.apache.tuweni.scuttlebutt.rpc.RPCResponse
 import org.apache.tuweni.scuttlebutt.rpc.mux.ScuttlebuttStreamHandler
 import org.openlaw.scuttlebutt.persistence.driver.ScuttlebuttDriver
+import org.openlaw.scuttlebutt.persistence.model.AllowAccess
 import org.openlaw.scuttlebutt.persistence.reader.{PageStream, ScuttlebuttStreamRangeFiller}
 import org.openlaw.scuttlebutt.persistence.serialization.{PersistedMessage, ScuttlebuttPersistenceSerializer}
 
@@ -262,7 +263,22 @@ class ScuttlebuttReadJournal(
 
     val graph = new TuweniStreamToAkkaSourceShape(system, handler)
 
-    Source.fromGraph(graph).map(toEnvelope)
+    /**
+      * If the first event we see is an `AllowAccess` event with a sequence number greater than the one we queried for,
+      * it indicates that we have just been given access to an entity with events that were previously not visible to us,
+      * so we restart the stream to get the previous events. Otherwise, we start the stream as normal
+      */
+    val source = Source.fromGraph(graph).map(toEnvelope)
+      source
+      .take(1)
+      .flatMapConcat({
+        case (envelope: EventEnvelope)
+          if envelope.sequenceNr > fromSequenceNr && envelope.event.isInstanceOf[AllowAccess] =>
+            eventsByPersistenceIdSource(persistenceId, fromSequenceNr, toSequenceNr, live, author)
+          case (envelope: EventEnvelope) => source
+        }
+      )
+
   }
 
 }
