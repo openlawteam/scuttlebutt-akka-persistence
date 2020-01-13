@@ -4,39 +4,41 @@ import java.io.ByteArrayInputStream
 import java.util
 import java.util.function.Function
 
+import akka.NotUsed
+import akka.actor.ActorSystem
 import akka.persistence.PersistentRepr
-import akka.persistence.query.{EventEnvelope, Sequence}
-import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
-import com.fasterxml.jackson.databind.node.{JsonNodeFactory, ObjectNode}
-import org.apache.tuweni.concurrent.AsyncResult
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.{Keep, Sink, Source}
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.tuweni.scuttlebutt.rpc._
 import org.apache.tuweni.scuttlebutt.rpc.mux.exceptions.ConnectionClosedException
-import org.apache.tuweni.scuttlebutt.rpc.mux.{Multiplexer, ScuttlebuttStreamHandler}
-import org.openlaw.scuttlebutt.persistence.converters.FutureConverters
-import org.openlaw.scuttlebutt.persistence.converters.FutureConverters.asyncResultToFuture
+import org.apache.tuweni.scuttlebutt.rpc.mux.ScuttlebuttStreamHandler
 import org.openlaw.scuttlebutt.persistence.model.{AuthorStreamOptions, StreamOptions, WhoAmIResponse}
 import org.openlaw.scuttlebutt.persistence.serialization.{PersistedMessage, ScuttlebuttPersistenceSerializer}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
 class ScuttlebuttDriver(
-                         multiplexer: Multiplexer,
+                         actorSystem: ActorSystem,
+                         multiplexer: ReconnectingScuttlebuttConnection,
                          objectMapper: ObjectMapper,
                          scuttlebuttPersistenceSerializer: ScuttlebuttPersistenceSerializer
                        ) {
 
-  def getLiveAuthorStream(handler: Function[Runnable, ScuttlebuttStreamHandler]): Unit = {
+  implicit val materializer = ActorMaterializer()(actorSystem)
+
+  def getLiveAuthorStream(): Source[String, NotUsed] = {
     val function: RPCFunction = new RPCFunction(
       util.Arrays.asList("akkaPersistenceIndex", "persistenceIds"),
       "allOtherAuthors")
 
     val request: RPCStreamRequest = new RPCStreamRequest(function, util.Arrays.asList(new AuthorStreamOptions(true)))
 
-    multiplexer.openStream(request, handler)
+    multiplexer.openStream(request)
+      .map(response => response.asString())
   }
-
 
   def publishPersistentRep(persistentRepr: PersistentRepr): Future[Try[Unit]] = {
     val message = makeRPCMessage(persistentRepr)
@@ -57,20 +59,18 @@ class ScuttlebuttDriver(
   def myEventsByPersistenceId(persistenceId: String,
                               fromSequenceNr: Long,
                               toSequenceNr: Long,
-                              live: Boolean,
-                              handler: Function[Runnable, ScuttlebuttStreamHandler]) = {
+                              live: Boolean): Source[RPCResponse, NotUsed] = {
 
 
     // 'null' for the author field is a shortcut for 'my ident'.
-    eventsByPersistenceId(null, persistenceId, fromSequenceNr, toSequenceNr, live, handler)
+    eventsByPersistenceId(null, persistenceId, fromSequenceNr, toSequenceNr, live)
   }
 
   def eventsByPersistenceId(author: String,
                             persistenceId: String,
                             fromSequenceNr: Long,
                             toSequenceNr: Long,
-                            live: Boolean,
-                            handler: Function[Runnable, ScuttlebuttStreamHandler]) = {
+                            live: Boolean): Source[RPCResponse, NotUsed] = {
 
     val function: RPCFunction = new RPCFunction(
       util.Arrays.asList("akkaPersistenceIndex", "events"),
@@ -83,7 +83,7 @@ class ScuttlebuttDriver(
       toSequenceNr.asInstanceOf[Object],
       live.asInstanceOf[Object]))
 
-    multiplexer.openStream(request, handler)
+    multiplexer.openStream(request)
   }
 
   def currentPersistenceIds(): Future[Try[List[String]]] = {
@@ -127,7 +127,7 @@ class ScuttlebuttDriver(
 
     val request: RPCAsyncRequest = new RPCAsyncRequest(function, util.Arrays.asList())
 
-    asyncResultToFuture(multiplexer.makeAsyncRequest(request)).map(response => response.asJSON(
+    multiplexer.makeAsyncRequest(request).map(response => response.asJSON(
       objectMapper, classOf[WhoAmIResponse]
     )).map(id => Success(id.id)).recover{
       case ex: Throwable => Failure(ex)
@@ -144,30 +144,15 @@ class ScuttlebuttDriver(
     stringStreamToArrayHandler(request)
   }
 
-  private def stringStreamToArrayHandler(request: RPCStreamRequest) = {
-    val promise: Promise[List[String]] = Promise()
-
-    multiplexer.openStream(request, (stopper) => {
-      new ScuttlebuttStreamHandler {
-        var results: Seq[String] = List()
-
-        override def onMessage(message: RPCResponse): Unit = {
-          results = results :+ message.asString()
-        }
-
-        override def onStreamEnd(): Unit = {
-          promise.success(results.toList)
-        }
-
-        override def onStreamError(ex: Exception): Unit = {
-          promise.failure(ex)
-        }
-      }
-    })
-
-    promise.future.map(Success(_)).recover {
-      case exception => Failure(exception)
-    }
+  /**
+    * Makes an RPC stream request, and fills each item in the stream response into a list of strings.
+    * Assumes that the RPC response body type is a 'string' (not JSON, etc.)
+    *
+    * @param request the RPC async request details.
+    * @return The future is completed with a result list if successful, otherwise it is completed with a failure
+    */
+  private def stringStreamToArrayHandler(request: RPCStreamRequest): Future[Try[List[String]]] = {
+    rpcResponseArrayFiller(request).map(_.map(_.map(_.asString())))
   }
 
   def getEventsForAuthor(authorId: String, start: Long, end: Long): Future[Try[List[RPCResponse]]] = {
@@ -181,32 +166,20 @@ class ScuttlebuttDriver(
     rpcResponseArrayFiller(request)
   }
 
-  private def rpcResponseArrayFiller(request: RPCStreamRequest) = {
-    var promise: Promise[List[RPCResponse]] = Promise()
+  /**
+    * Opens a scuttlebutt stream request, and fills the stream items into a list of RPCResponse objects. Each item
+    * may contain strings, binary, JSON, etc. A higher level function should marshall this data.
+    *
+    * @param request the request details
+    * @return the list of RPC responses for each stream item if successful, otherwise an error
+    */
+  private def rpcResponseArrayFiller(request: RPCStreamRequest): Future[Try[List[RPCResponse]]] = {
+    val result = multiplexer.openStream(request).toMat(Sink.seq)(Keep.right).run().map(_.toList)
 
-    multiplexer.openStream(request, (stopper) => {
-      new ScuttlebuttStreamHandler {
-        var results: Seq[RPCResponse] = List()
-
-        override def onMessage(message: RPCResponse): Unit = {
-          results = results :+ message
-        }
-
-        override def onStreamEnd(): Unit = {
-          promise.success(results.toList)
-        }
-
-        override def onStreamError(ex: Exception): Unit = {
-          promise.failure(ex)
-        }
-      }
-    })
-
-    promise.future.map(Success(_)).recover {
+    result.map(Success(_)).recover {
       case exception => Failure(exception)
     }
   }
-
 
   private def makeRPCMessage(persistentRep: PersistentRepr): RPCAsyncRequest = {
 
@@ -234,8 +207,7 @@ class ScuttlebuttDriver(
 
   private def doScuttlebuttPublish(request: RPCAsyncRequest): Future[Try[Unit]] = {
 
-    val rpcResult: AsyncResult[RPCResponse] = multiplexer.makeAsyncRequest(request)
-    val resultFuture: Future[RPCResponse] = asyncResultToFuture(rpcResult)
+    val resultFuture: Future[RPCResponse] = multiplexer.makeAsyncRequest(request)
 
     // Success if the future wasn't failed
     resultFuture.map(_ => Success()).recover({

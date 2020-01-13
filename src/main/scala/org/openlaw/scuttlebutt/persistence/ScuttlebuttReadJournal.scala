@@ -13,7 +13,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.typesafe.config.Config
 import org.apache.tuweni.scuttlebutt.rpc.RPCResponse
 import org.apache.tuweni.scuttlebutt.rpc.mux.ScuttlebuttStreamHandler
-import org.openlaw.scuttlebutt.persistence.driver.ScuttlebuttDriver
+import org.openlaw.scuttlebutt.persistence.driver.{ScuttlebuttDriver, TuweniStreamToAkkaSourceShape}
 import org.openlaw.scuttlebutt.persistence.model.AllowAccess
 import org.openlaw.scuttlebutt.persistence.reader.{PageStream, ScuttlebuttStreamRangeFiller}
 import org.openlaw.scuttlebutt.persistence.serialization.{PersistedMessage, ScuttlebuttPersistenceSerializer}
@@ -36,7 +36,7 @@ class ScuttlebuttReadJournal(
   with akka.persistence.query.scaladsl.PersistenceIdsQuery
   with akka.persistence.query.scaladsl.CurrentPersistenceIdsQuery {
 
-  val rangeFiller = new ScuttlebuttStreamRangeFiller(scuttlebuttDriver, objectMapper)
+  val rangeFiller = new ScuttlebuttStreamRangeFiller(system, scuttlebuttDriver, objectMapper)
 
   /**
     * A stream of the current events for the local instance by persistenceId (stream ends when there
@@ -186,12 +186,7 @@ class ScuttlebuttReadJournal(
     * @return the author stream
     */
   def allAuthorsLive: Source[String, NotUsed] = {
-    val handler: (Function[Runnable, ScuttlebuttStreamHandler] => Unit) =
-      (fn) => scuttlebuttDriver.getLiveAuthorStream(fn)
-
-    val graph = new TuweniStreamToAkkaSourceShape(system, handler)
-
-    Source.fromGraph(graph).map(item => item.asString())
+    scuttlebuttDriver.getLiveAuthorStream()
   }
 
 
@@ -258,17 +253,14 @@ class ScuttlebuttReadJournal(
                                            live: Boolean,
                                            author: String = null): Source[EventEnvelope, NotUsed] = {
 
-    val handler: (Function[Runnable, ScuttlebuttStreamHandler] => Unit) =
-      (fn) => scuttlebuttDriver.eventsByPersistenceId(author, persistenceId, fromSequenceNr, toSequenceNr, live, fn)
-
-    val graph = new TuweniStreamToAkkaSourceShape(system, handler)
-
     /**
       * If the first event we see is an `AllowAccess` event with a sequence number greater than the one we queried for,
       * it indicates that we have just been given access to an entity with events that were previously not visible to us,
       * so we restart the stream to get the previous events. Otherwise, we start the stream as normal
       */
-    val source = Source.fromGraph(graph).map(toEnvelope)
+    val source = scuttlebuttDriver.eventsByPersistenceId(author, persistenceId, fromSequenceNr, toSequenceNr, live)
+        .map(toEnvelope)
+
       source
       .take(1)
       .flatMapConcat({

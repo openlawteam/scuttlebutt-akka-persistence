@@ -1,36 +1,37 @@
 package org.openlaw.scuttlebutt.persistence
 
+import akka.Done
 import akka.actor.ExtendedActorSystem
 import akka.persistence.journal.AsyncWriteJournal
-import akka.persistence.{AtomicWrite, Persistence, PersistentRepr}
-import akka.serialization.{Serialization, SerializationExtension}
+import akka.persistence.{AtomicWrite, PersistentRepr}
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Sink
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
 import com.typesafe.config.Config
-import org.apache.tuweni.scuttlebutt.rpc.mux.{RPCHandler, ScuttlebuttStreamHandler}
-import org.apache.tuweni.scuttlebutt.rpc._
-import org.openlaw.scuttlebutt.persistence.driver.{MultiplexerLoader, ScuttlebuttDriver}
+import org.apache.tuweni.scuttlebutt.rpc.RPCResponse
+import org.openlaw.scuttlebutt.persistence.driver.{ReconnectingScuttlebuttConnection, ScuttlebuttDriver}
 import org.openlaw.scuttlebutt.persistence.serialization.{PersistedMessage, ScuttlebuttPersistenceSerializer}
 
 import scala.collection.immutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, _}
-import scala.util.{Failure, Try}
+import scala.util.{Failure, Success, Try}
+import scala.concurrent.duration._
 
 class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
+
+  implicit val executionContext = context.system.dispatcher
+  implicit val materializer = ActorMaterializer()
 
   val serializationConfig = new ScuttlebuttPersistenceSerializer(context.system)
 
   val objectMapper: ObjectMapper = serializationConfig.getObjectMapper()
   val scuttlebuttPersistenceSerializer = new ScuttlebuttPersistenceSerializer(context.system)
 
-  val loader: MultiplexerLoader = new MultiplexerLoader(objectMapper, config)
+  val driver = ReconnectingScuttlebuttConnection(context.system, config, 1 minute)
 
-  val rpcHandler: RPCHandler = loader.loadMultiplexer match {
-    case Left(err) => throw new Exception(err)
-    case Right(handler) => handler
-  }
-  val scuttlebuttDriver: ScuttlebuttDriver = new ScuttlebuttDriver(rpcHandler, objectMapper, scuttlebuttPersistenceSerializer)
+  val scuttlebuttDriver: ScuttlebuttDriver = new ScuttlebuttDriver(context.system, driver, objectMapper, scuttlebuttPersistenceSerializer)
 
   override def asyncWriteMessages(messages: immutable.Seq[AtomicWrite]): Future[immutable.Seq[Try[Unit]]] = {
 
@@ -67,14 +68,33 @@ class ScuttlebuttAsyncWriteJournal(config: Config) extends AsyncWriteJournal {
 
   override def asyncReplayMessages(persistenceId: String, fromSequenceNr: Long, toSequenceNr: Long, max: Long)(
     recoveryCallback: PersistentRepr => Unit
-  ) = {
-    val finishedReplaysPromise = Promise[Unit]();
+  ): Future[Unit] = {
 
-    scuttlebuttDriver.myEventsByPersistenceId(persistenceId, fromSequenceNr, toSequenceNr, false, (closer: Runnable) => {
-      new PersistentReprStreamHandler(objectMapper, scuttlebuttPersistenceSerializer, closer, recoveryCallback, finishedReplaysPromise)
-    })
+    val events = scuttlebuttDriver.myEventsByPersistenceId(persistenceId, fromSequenceNr, toSequenceNr, false)
 
-    finishedReplaysPromise.future
+    events
+      .map(deserializeIntoPersistentRepl)
+      .runForeach({
+        case Success(repr) => recoveryCallback(repr)
+        // Indicate failure to the returned Future (satisfying the method contract to fail the future if any item fails),
+        // and stop the stream
+        case Failure(ex) => throw ex
+      }).map(_ => {})
+
+  }
+
+  private def deserializeIntoPersistentRepl(rpcMessage: RPCResponse): Try[PersistentRepr] = {
+    val content:ObjectNode = rpcMessage.asJSON(objectMapper, classOf[ObjectNode])
+    val payload: JsonNode = content.findPath("payload")
+    val payloadBytes = objectMapper.writeValueAsBytes(payload)
+
+    val persistentRepr : PersistentRepr = objectMapper.treeToValue(content, classOf[PersistedMessage])
+    val deserializePayload = scuttlebuttPersistenceSerializer.deserialize(payloadBytes,  persistentRepr.manifest)
+
+    deserializePayload map {
+      value => persistentRepr.withPayload(value)
+    }
+
   }
 
   override def asyncReadHighestSequenceNr(persistenceId: String, fromSequenceNr: Long): Future[Long] = {

@@ -16,6 +16,8 @@ import org.apache.tuweni.scuttlebutt.rpc.mux.RPCHandler
 import org.logl.Level
 import org.logl.logl.SimpleLogger
 
+import scala.concurrent.Future
+
 
 class MultiplexerLoader(objectMapper: ObjectMapper, scuttlebuttConf: Config) {
 
@@ -27,7 +29,12 @@ class MultiplexerLoader(objectMapper: ObjectMapper, scuttlebuttConf: Config) {
     * @return the rpc handler to perform requests with
     */
   def loadMultiplexer: Either[String, RPCHandler] = {
+    val result = loadMultiplexerAsync
 
+    result.map(_.get())
+  }
+
+  def loadMultiplexerAsync: Either[String, AsyncResult[RPCHandler]] = {
     for {
       localKeys <- getKeys()
       networkKeyBytes32 <- getNetworkKey()
@@ -48,9 +55,8 @@ class MultiplexerLoader(objectMapper: ObjectMapper, scuttlebuttConf: Config) {
         makeHandler(sender, terminationFn)
       })
 
-      clientHandler <-getClientHandler(onConnect)
     } yield {
-      clientHandler
+      onConnect
     }
   }
 

@@ -1,13 +1,13 @@
-package org.openlaw.scuttlebutt.persistence
+package org.openlaw.scuttlebutt.persistence.driver
 
 import java.util.function.Function
 
 import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
+import akka.stream.stage.{GraphStage, GraphStageLogic, OutHandler}
 import akka.stream.{Attributes, Outlet, SourceShape}
-import akka.stream.stage.{AsyncCallback, GraphStage, GraphStageLogic, OutHandler}
 import org.apache.tuweni.scuttlebutt.rpc.RPCResponse
 import org.apache.tuweni.scuttlebutt.rpc.mux.ScuttlebuttStreamHandler
-import org.openlaw.scuttlebutt.persistence.driver.ScuttlebuttDriver
+import org.openlaw.scuttlebutt.persistence.{ReadyForNext, ScuttlebuttStreamActor, StreamEnd}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Promise
