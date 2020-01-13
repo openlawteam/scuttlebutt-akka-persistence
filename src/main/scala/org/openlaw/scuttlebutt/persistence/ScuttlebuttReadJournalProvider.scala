@@ -1,13 +1,14 @@
 package org.openlaw.scuttlebutt.persistence
 
-import akka.actor.ExtendedActorSystem
-import akka.persistence.Persistence
+import akka.actor.{ExtendedActorSystem, Props}
 import akka.persistence.query.scaladsl.ReadJournal
 import akka.persistence.query.{ReadJournalProvider, javadsl}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.typesafe.config.Config
-import org.openlaw.scuttlebutt.persistence.driver.{MultiplexerLoader, ScuttlebuttDriver}
+import org.openlaw.scuttlebutt.persistence.driver.{ReconnectingScuttlebuttConnection, ScuttlebuttDriver, ScuttlebuttDriverActor}
 import org.openlaw.scuttlebutt.persistence.serialization.ScuttlebuttPersistenceSerializer
+
+import scala.concurrent.duration._
 
 class ScuttlebuttReadJournalProvider(system: ExtendedActorSystem, config: Config) extends ReadJournalProvider {
 
@@ -21,18 +22,15 @@ class ScuttlebuttReadJournalProvider(system: ExtendedActorSystem, config: Config
 
   private def scalaJournal(): ScuttlebuttReadJournal = {
 
-    val serializer =  new ScuttlebuttPersistenceSerializer(system)
-    val objectMapper = serializer.getObjectMapper()
+    val serializationConfig = new ScuttlebuttPersistenceSerializer(system)
 
-    val multiplexerLoader =  new MultiplexerLoader(objectMapper, config)
+    val objectMapper: ObjectMapper = serializationConfig.getObjectMapper()
+    val scuttlebuttPersistenceSerializer = new ScuttlebuttPersistenceSerializer(system)
 
-    multiplexerLoader.loadMultiplexer match {
-      case Left(error) => throw new Exception(error)
-      case Right(rpcHandler) => {
-        val scuttlebuttDriver = new ScuttlebuttDriver(rpcHandler, objectMapper, serializer)
-        new ScuttlebuttReadJournal(system, config, scuttlebuttDriver, objectMapper, serializer)
-      }
-    }
+    val driver = ReconnectingScuttlebuttConnection(system, config, 5 seconds)
+
+    val scuttlebuttDriver: ScuttlebuttDriver = new ScuttlebuttDriver(system, driver, objectMapper, scuttlebuttPersistenceSerializer)
+    new ScuttlebuttReadJournal(system, config, scuttlebuttDriver, objectMapper, scuttlebuttPersistenceSerializer)
 
   }
 
